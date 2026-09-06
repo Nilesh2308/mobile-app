@@ -1,0 +1,10 @@
+﻿.env
+backend/.env
+venv/
+backend/venv/
+__pycache__/
+backend/local_qdrant_data/
+.dart_tool/
+build/
+backend/data/voiceai.db
+backend/debug_scores.txt

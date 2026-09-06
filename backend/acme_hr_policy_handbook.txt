@@ -1,0 +1,81 @@
+Acme TechCorp — Employee HR Policy Handbook
+Version 3.2 — Effective January 2026
+
+1. Leave Policy
+All full-time employees of Acme TechCorp are entitled to 18 days of paid annual leave per calendar
+year, in addition to 10 public holidays as per the official company holiday calendar. Annual leave
+accrues at a rate of 1.5 days per completed month of service.
+
+Employees are entitled to 12 days of paid sick leave per year. A medical certificate is required for sick
+leave exceeding 2 consecutive days. Unused sick leave cannot be carried forward to the next calendar
+year.
+
+Maternity leave is provided for 26 weeks as per statutory requirements. Paternity leave is provided for
+15 calendar days, to be availed within 3 months of the child's birth.
+
+Leave requests must be submitted through the HR portal at least 5 working days in advance for
+planned leave. Emergency leave may be approved retroactively by the reporting manager.
+
+2. Work From Home (WFH) Policy
+Employees in eligible roles may work from home up to 2 days per week, subject to manager approval.
+Fully remote arrangements require Director-level sign-off and are evaluated on a case-by-case basis.
+
+Employees working from home must remain reachable during core business hours (10:00 AM to 4:00
+PM local time) and are expected to maintain a stable internet connection of at least 20 Mbps for video
+calls.
+
+The company provides a one-time home-office setup allowance of INR 15,000 for employees who are
+approved for a permanent hybrid or remote arrangement.
+
+3. Travel & Reimbursement Policy
+Employees traveling for official business purposes are entitled to reimbursement for economy-class
+airfare, standard hotel accommodation (up to INR 6,000 per night in metro cities and INR 4,000 per
+night in non-metro cities), and local conveyance.
+
+Daily meal allowance during official travel is INR 1,200 per day within India and USD 60 per day for
+international travel. All reimbursement claims must be submitted within 15 days of completing travel,
+along with original receipts, through the Expense Management System.
+
+Reimbursement for client entertainment expenses requires prior written approval from the employee's
+department head and is capped at INR 5,000 per event.
+
+4. Code of Conduct
+All employees are expected to act with integrity, honesty, and professionalism in all business dealings.
+Conflicts of interest must be disclosed to HR immediately upon identification.
+
+Acme TechCorp maintains a zero-tolerance policy toward harassment, discrimination, or retaliation of
+any kind. Employees may report violations confidentially through the Ethics Hotline, available 24/7 at
+ethics@acmetechcorp.example.
+
+Employees must not accept gifts or gratuities from vendors or clients exceeding INR 2,000 in value
+without prior disclosure to their manager.
+
+5. IT & Data Security Policy
+All company laptops must have full-disk encryption and an approved endpoint security agent installed
+before being used to access company systems. Passwords must be at least 12 characters long and
+rotated every 90 days.
+
+Employees are prohibited from storing confidential company data on personal cloud storage accounts
+(e.g., personal Google Drive, Dropbox). All confidential documents must be shared only via the
+approved corporate file-sharing platform.
+
+Any suspected security incident, including phishing emails or lost devices, must be reported to the IT
+Security team within 2 hours of discovery via security@acmetechcorp.example.
+
+6. Payroll & Benefits
+Salaries are disbursed on the last working day of each month via direct bank transfer. Payslips are
+made available on the HR portal by the 1st of the following month.
+
+Acme TechCorp provides group health insurance coverage of INR 5,00,000 per employee, extendable
+to cover spouse and up to two dependent children at a subsidized premium.
+
+Employees become eligible for the Provident Fund and Gratuity benefits as per applicable statutory
+regulations after completing 6 months and 5 years of continuous service, respectively.
+
+An annual performance bonus, ranging from 8% to 20% of base salary depending on individual and
+company performance ratings, is paid out in April each year.
+
+7. Probation & Confirmation
+New employees undergo a probation period of 6 months from their date of joining. Performance will be
+reviewed at the 3-month and 5-month marks. Confirmation of employment is subject to satisfactory
+performance and conduct during this period.
