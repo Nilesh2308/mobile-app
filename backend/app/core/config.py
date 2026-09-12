@@ -7,6 +7,12 @@ class Settings(BaseSettings):
     QWEN_LLM_MODEL: str = "qwen3-14b"
     QWEN_API_URL: str = "https://chat.theonetechnologies.co.in/api/chat/completions"
 
+    # Groq Settings (Cloud STT & LLM)
+    GROQ_API_KEY: str = ""
+    GROQ_API_KEY_BACKUP: str = ""
+    STT_ENGINE: str = "groq" # "groq" (cloud ~0.2s, 0MB RAM) or "faster-whisper" (local)
+    GROQ_WHISPER_MODEL: str = "whisper-large-v3-turbo"
+
     # AI Models Settings
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
     WHISPER_MODEL_SIZE: str = "small"

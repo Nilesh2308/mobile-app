@@ -14,7 +14,11 @@ class EmbeddingWrapper:
     def load_model(self):
         try:
             logger.info(f"Loading embedding model: {self.model_name}")
-            self.model = SentenceTransformer(self.model_name, local_files_only=True)
+            try:
+                self.model = SentenceTransformer(self.model_name, local_files_only=True)
+            except Exception:
+                logger.info(f"Local files not found, downloading {self.model_name}...")
+                self.model = SentenceTransformer(self.model_name, local_files_only=False)
             logger.info("Embedding model loaded successfully.")
         except Exception as e:
             logger.error(f"Failed to load embedding model: {e}")
