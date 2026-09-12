@@ -35,10 +35,13 @@ async def health_check():
     else:
         health_status["status"] = "degraded"
 
-    # Check Whisper
-    if stt_service.model is not None:
-        health_status["components"]["whisper"] = True
-    else:
+    # Check STT (Groq Cloud Whisper or local Whisper)
+    try:
+        if getattr(stt_service, "groq_client", None) is not None or getattr(stt_service, "local_model", None) is not None or getattr(stt_service, "model", None) is not None:
+            health_status["components"]["whisper"] = True
+        else:
+            health_status["status"] = "degraded"
+    except Exception:
         health_status["status"] = "degraded"
 
     # Check TTS (Edge-TTS or Kokoro)

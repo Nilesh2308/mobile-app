@@ -15,17 +15,7 @@ abstract final class AppConfig {
   /// - Desktop/Web uses localhost:8000
   /// - Physical device can be configured in settings or set here directly
   static String get defaultBaseUrl {
-    if (kIsWeb) return 'http://localhost:8000';
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return 'http://10.0.2.2:8000'; // Default Android emulator host loopback
-      case TargetPlatform.iOS:
-      case TargetPlatform.windows:
-      case TargetPlatform.macOS:
-      case TargetPlatform.linux:
-      default:
-        return 'http://localhost:8000';
-    }
+    return 'https://mobile-app-w44p.onrender.com';
   }
 
   static String _activeBaseUrl = defaultBaseUrl;

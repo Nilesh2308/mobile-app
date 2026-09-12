@@ -28,6 +28,11 @@ class STTWrapper:
         self.engine = getattr(settings, "STT_ENGINE", "groq")
         self.groq_model = getattr(settings, "GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
 
+    @property
+    def model(self):
+        return self.groq_client or self.local_model
+
+
     def load_model(self):
         # 1. Initialize Groq Cloud Whisper client if API key is provided
         if GROQ_AVAILABLE and settings.GROQ_API_KEY:
