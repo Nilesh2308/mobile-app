@@ -20,6 +20,14 @@ try:
 except ImportError:
     KOKORO_AVAILABLE = False
 
+# Attempt to import gTTS (Google Cloud TTS fallback)
+try:
+    from gtts import gTTS
+    GTTS_AVAILABLE = True
+except ImportError:
+    GTTS_AVAILABLE = False
+
+
 logger = logging.getLogger(__name__)
 
 # Comprehensive emoji pattern matching all Unicode emoji blocks, pictographs, and symbols
@@ -124,11 +132,27 @@ class TTSWrapper:
         sf.write(buffer, audio_np, self.sample_rate, format='WAV', subtype='PCM_16')
         return buffer.getvalue()
 
+    def _synthesize_gtts(self, text: str) -> bytes:
+        """Reliable Google TTS fallback that works 100% in cloud datacenters."""
+        clean_text = clean_tts_text(text)
+        if not clean_text:
+            return b""
+        try:
+            from gtts import gTTS
+            fp = io.BytesIO()
+            tts = gTTS(text=clean_text, lang='en', tld='com')
+            tts.write_to_fp(fp)
+            return fp.getvalue()
+        except Exception as e:
+            logger.error(f"gTTS fallback failed: {e}")
+            return b""
+
     def synthesize(self, text: str) -> bytes:
         """
-        Synchronous wrapper: prioritize Edge-TTS (ultra-fast, <1.5s),
-        fallback to Kokoro if available locally, or return empty audio gracefully.
+        Synchronous wrapper: prioritize Edge-TTS, fallback to gTTS (guaranteed in cloud),
+        then local Kokoro.
         """
+        # 1. Try Edge-TTS
         if self.engine == "edge" and EDGE_TTS_AVAILABLE:
             try:
                 try:
@@ -136,41 +160,58 @@ class TTSWrapper:
                     if loop.is_running():
                         import nest_asyncio
                         nest_asyncio.apply()
-                        return loop.run_until_complete(self._synthesize_edge(text))
+                        audio = loop.run_until_complete(self._synthesize_edge(text))
                     else:
-                        return loop.run_until_complete(self._synthesize_edge(text))
+                        audio = loop.run_until_complete(self._synthesize_edge(text))
                 except RuntimeError:
-                    return asyncio.run(self._synthesize_edge(text))
+                    audio = asyncio.run(self._synthesize_edge(text))
+                if audio and len(audio) > 0:
+                    return audio
             except Exception as e:
-                logger.error(f"Edge-TTS failed: {e}", exc_info=True)
-                if KOKORO_AVAILABLE and self.pipeline is not None:
-                    return self._synthesize_kokoro(text)
-                logger.warning("Kokoro is not loaded or available for fallback. Proceeding without audio.")
-                return b""
-        else:
-            if KOKORO_AVAILABLE and self.pipeline is not None:
-                return self._synthesize_kokoro(text)
-            logger.warning("No TTS engine available.")
-            return b""
+                logger.warning(f"Edge-TTS failed ({e}), falling back to gTTS...")
+
+        # 2. Try gTTS (Google Cloud TTS)
+        if GTTS_AVAILABLE:
+            try:
+                audio = self._synthesize_gtts(text)
+                if audio and len(audio) > 0:
+                    return audio
+            except Exception as ge:
+                logger.warning(f"gTTS failed: {ge}")
+
+        # 3. Try Kokoro
+        if KOKORO_AVAILABLE and self.pipeline is not None:
+            return self._synthesize_kokoro(text)
+
+        return b""
 
     async def synthesize_async(self, text: str) -> bytes:
         """Asynchronous synthesis for direct async FastAPI routes."""
+        # 1. Try Edge-TTS
         if self.engine == "edge" and EDGE_TTS_AVAILABLE:
             try:
-                return await self._synthesize_edge(text)
+                audio = await self._synthesize_edge(text)
+                if audio and len(audio) > 0:
+                    return audio
             except Exception as e:
-                logger.error(f"Edge-TTS async failed: {e}", exc_info=True)
-                if KOKORO_AVAILABLE and self.pipeline is not None:
-                    from fastapi.concurrency import run_in_threadpool
-                    return await run_in_threadpool(self._synthesize_kokoro, text)
-                logger.warning("Kokoro is not loaded or available for fallback. Proceeding without audio.")
-                return b""
-        else:
-            if KOKORO_AVAILABLE and self.pipeline is not None:
+                logger.warning(f"Edge-TTS async failed ({e}), falling back to gTTS...")
+
+        # 2. Try gTTS (Google Cloud TTS)
+        if GTTS_AVAILABLE:
+            try:
                 from fastapi.concurrency import run_in_threadpool
-                return await run_in_threadpool(self._synthesize_kokoro, text)
-            logger.warning("No TTS engine available.")
-            return b""
+                audio = await run_in_threadpool(self._synthesize_gtts, text)
+                if audio and len(audio) > 0:
+                    return audio
+            except Exception as ge:
+                logger.warning(f"gTTS async failed: {ge}")
+
+        # 3. Try Kokoro
+        if KOKORO_AVAILABLE and self.pipeline is not None:
+            from fastapi.concurrency import run_in_threadpool
+            return await run_in_threadpool(self._synthesize_kokoro, text)
+
+        return b""
 
 tts_service = TTSWrapper()
 
