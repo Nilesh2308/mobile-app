@@ -71,9 +71,23 @@ async def health_check():
 async def test_tts_endpoint():
     try:
         from app.core.tts import tts_service
-        data = await tts_service.synthesize_async("Hello! Voice synthesis is fully working in the cloud.")
-        return {"status": "ok", "audio_bytes": len(data), "engine": tts_service.engine}
+        import edge_tts
+        clean = "Hello, testing voice audio."
+        comm = edge_tts.Communicate(clean, tts_service.edge_voice)
+        chunks = []
+        audio = bytearray()
+        async for chunk in comm.stream():
+            chunks.append(chunk["type"])
+            if chunk["type"] == "audio":
+                audio.extend(chunk["data"])
+        return {
+            "status": "ok" if len(audio) > 0 else "empty",
+            "audio_bytes": len(audio),
+            "chunk_types": chunks[:10],
+            "voice": tts_service.edge_voice
+        }
     except Exception as e:
         import traceback
         return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
 
