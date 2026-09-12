@@ -30,7 +30,8 @@ class STTWrapper:
         # faster-whisper accepts binary streams
         audio_stream = io.BytesIO(audio_bytes)
         
-        segments, info = self.model.transcribe(audio_stream, beam_size=5)
+        beam_size = getattr(settings, "WHISPER_BEAM_SIZE", 1)
+        segments, info = self.model.transcribe(audio_stream, beam_size=beam_size, temperature=0.0)
         
         text = " ".join([segment.text for segment in segments])
         return text.strip()

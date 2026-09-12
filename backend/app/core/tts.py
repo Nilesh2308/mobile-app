@@ -1,61 +1,163 @@
 import logging
 import io
+import re
+import asyncio
+from typing import Optional
 import soundfile as sf
 from app.core.config import settings
 
-# Attempt to import kokoro components - this assumes misaki/kokoro is installed locally
+# Attempt to import edge_tts
+try:
+    import edge_tts
+    EDGE_TTS_AVAILABLE = True
+except ImportError:
+    EDGE_TTS_AVAILABLE = False
+
+# Attempt to import kokoro components
 try:
     from kokoro import KPipeline
     KOKORO_AVAILABLE = True
 except ImportError:
     KOKORO_AVAILABLE = False
-    
+
 logger = logging.getLogger(__name__)
+
+# Comprehensive emoji pattern matching all Unicode emoji blocks, pictographs, and symbols
+_EMOJI_PATTERN = re.compile(
+    '['
+    '\U00010000-\U0010FFFF'  # All supplemental/astral plane emojis, pictographs, flags
+    '\U00002600-\U000027BF'  # Miscellaneous symbols & dingbats
+    '\U00002300-\U000023FF'  # Miscellaneous technical
+    '\U00002B50-\U00002B55'  # Stars and shapes
+    '\U0000FE00-\U0000FE0F'  # Variation selectors
+    '\U0000200D'             # Zero-width joiners
+    ']+',
+    flags=re.UNICODE
+)
+
+def clean_tts_text(text: str) -> str:
+    """
+    Strip emojis, smilies, markdown markers, thinking tags, and symbols
+    so natural speech synthesis only pronounces real spoken words without
+    reading emoji descriptions (e.g. 'smiling face', 'thumbs up').
+    """
+    if not text:
+        return ""
+    # Strip reasoning tags
+    t = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Strip all Unicode emojis and pictographs
+    t = _EMOJI_PATTERN.sub('', t)
+    # Strip common ASCII text emoticons (e.g., :), :-), :D, ;), <3)
+    t = re.sub(r'(?:[:;=8][\-\^]?[)D(\[\]{}@|/\\pP])', '', t)
+    t = re.sub(r'<3', '', t)
+    # Remove markdown links, keep label
+    t = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', t)
+    # Remove bold, italics, code backticks, headers, tildes
+    t = re.sub(r'[*_#`~]', '', t)
+    # Remove bullet markers
+    t = re.sub(r'^\s*[-*•]\s+', '', t, flags=re.MULTILINE)
+    # Collapse multiple newlines into a sentence pause
+    t = re.sub(r'\n+', '. ', t)
+    # Clean redundant spaces and space before punctuation
+    t = re.sub(r'\s+', ' ', t)
+    t = re.sub(r'\s+([.,!?;:])', r'\1', t).strip()
+    return t
 
 class TTSWrapper:
     def __init__(self):
         self.pipeline = None
-        self.voice = settings.KOKORO_VOICE
+        self.engine = settings.TTS_ENGINE
+        self.edge_voice = settings.EDGE_TTS_VOICE
+        self.kokoro_voice = settings.KOKORO_VOICE
         self.sample_rate = 24000
 
     def load_model(self):
-        if not KOKORO_AVAILABLE:
-            logger.warning("Kokoro library is not available. TTS will fail.")
-            return
+        logger.info(f"Initializing TTS Service (Engine: {self.engine}, Edge-TTS Available: {EDGE_TTS_AVAILABLE})")
+        if self.engine == "kokoro" or not EDGE_TTS_AVAILABLE:
+            if not KOKORO_AVAILABLE:
+                logger.warning("Neither Edge-TTS nor Kokoro library is available.")
+                return
+            try:
+                logger.info("Loading Kokoro TTS model (American English)...")
+                self.pipeline = KPipeline(lang_code='a')
+                logger.info("Kokoro model loaded successfully.")
+            except Exception as e:
+                logger.error(f"Failed to load Kokoro model: {e}")
+                if self.engine == "kokoro":
+                    raise
 
-        try:
-            logger.info("Loading Kokoro TTS model (American English)...")
-            # Initialize pipeline for American English ('a'). Adjust if British ('b') is needed.
-            self.pipeline = KPipeline(lang_code='a') 
-            logger.info("Kokoro model loaded successfully.")
-        except Exception as e:
-            logger.error(f"Failed to load Kokoro model: {e}")
-            raise
+    async def _synthesize_edge(self, text: str) -> bytes:
+        """Synthesize using high-speed, realistic Microsoft Edge neural voice (~1s)."""
+        clean_text = clean_tts_text(text)
+        if not clean_text:
+            return b""
+        communicate = edge_tts.Communicate(clean_text, self.edge_voice)
+        audio_data = bytearray()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_data.extend(chunk["data"])
+        return bytes(audio_data)
 
-    def synthesize(self, text: str) -> bytes:
+    def _synthesize_kokoro(self, text: str) -> bytes:
+        """Fallback local synthesis using Kokoro-82M."""
         if not self.pipeline:
-            raise RuntimeError("Kokoro model is not loaded or not available.")
-            
+            if KOKORO_AVAILABLE:
+                self.pipeline = KPipeline(lang_code='a')
+            else:
+                raise RuntimeError("Kokoro model is not loaded or not available.")
+
+        clean_text = clean_tts_text(text)
         generator = self.pipeline(
-            text, voice=self.voice, # <= change voice here
+            clean_text, voice=self.kokoro_voice,
             speed=1, split_pattern=r'\n+'
         )
-        
-        # Accumulate audio data
         audio_data = []
         for i, (gs, ps, audio) in enumerate(generator):
             audio_data.extend(audio)
-            
+
         if not audio_data:
             return b""
-            
-        # Convert to WAV bytes
+
         import numpy as np
         audio_np = np.array(audio_data)
-        
         buffer = io.BytesIO()
         sf.write(buffer, audio_np, self.sample_rate, format='WAV', subtype='PCM_16')
-        
         return buffer.getvalue()
+
+    def synthesize(self, text: str) -> bytes:
+        """
+        Synchronous wrapper: prioritize Edge-TTS (ultra-fast, <1.5s),
+        fallback to Kokoro if offline or on failure.
+        """
+        if self.engine == "edge" and EDGE_TTS_AVAILABLE:
+            try:
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        import nest_asyncio
+                        nest_asyncio.apply()
+                        return loop.run_until_complete(self._synthesize_edge(text))
+                    else:
+                        return loop.run_until_complete(self._synthesize_edge(text))
+                except RuntimeError:
+                    return asyncio.run(self._synthesize_edge(text))
+            except Exception as e:
+                logger.warning(f"Edge-TTS failed ({e}), falling back to Kokoro...")
+                return self._synthesize_kokoro(text)
+        else:
+            return self._synthesize_kokoro(text)
+
+    async def synthesize_async(self, text: str) -> bytes:
+        """Asynchronous synthesis for direct async FastAPI routes."""
+        if self.engine == "edge" and EDGE_TTS_AVAILABLE:
+            try:
+                return await self._synthesize_edge(text)
+            except Exception as e:
+                logger.warning(f"Edge-TTS async failed ({e}), falling back to Kokoro...")
+                from fastapi.concurrency import run_in_threadpool
+                return await run_in_threadpool(self._synthesize_kokoro, text)
+        else:
+            from fastapi.concurrency import run_in_threadpool
+            return await run_in_threadpool(self._synthesize_kokoro, text)
 
 tts_service = TTSWrapper()

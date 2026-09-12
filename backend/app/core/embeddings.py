@@ -22,13 +22,13 @@ class EmbeddingWrapper:
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
         if not self.model:
-            raise RuntimeError("Embedding model is not loaded.")
+            self.load_model()
         embeddings = self.model.encode(texts, normalize_embeddings=True)
         return embeddings.tolist()
 
     def embed_query(self, query: str) -> List[float]:
         if not self.model:
-            raise RuntimeError("Embedding model is not loaded.")
+            self.load_model()
         # Prepend query instruction for bge models
         instruct_query = f"{self.query_instruction}{query}"
         embedding = self.model.encode([instruct_query], normalize_embeddings=True)[0]

@@ -133,6 +133,49 @@ abstract final class AppShadows {
     ),
   ];
 
+  /// Neon glow shadow (for buttons, voice orb accents)
+  static List<BoxShadow> neonGlow(Color color, {double intensity = 0.4, double blur = 20}) => [
+    BoxShadow(
+      color: color.withValues(alpha: intensity),
+      offset: const Offset(0, 4),
+      blurRadius: blur,
+      spreadRadius: 2,
+    ),
+    BoxShadow(
+      color: color.withValues(alpha: intensity * 0.5),
+      offset: const Offset(0, 8),
+      blurRadius: blur * 2,
+      spreadRadius: -2,
+    ),
+  ];
+
   /// Shadow selector based on dark mode
   static List<BoxShadow> card(bool isDark) => isDark ? darkCard : lightCard;
+}
+
+/// Curated animation duration and curve tokens for consistent motion design.
+abstract final class AppAnimations {
+  // ─── Durations ─────────────────────────────────────────────────
+  static const Duration instant = Duration(milliseconds: 100);
+  static const Duration fast = Duration(milliseconds: 180);
+  static const Duration normal = Duration(milliseconds: 300);
+  static const Duration slow = Duration(milliseconds: 500);
+  static const Duration dramatic = Duration(milliseconds: 800);
+  static const Duration breathe = Duration(milliseconds: 2000);
+
+  // ─── Curves ────────────────────────────────────────────────────
+  /// Snappy interaction (tap, press release)
+  static const Curve snappy = Curves.easeOutCubic;
+
+  /// Smooth entrance/exit animations
+  static const Curve smooth = Curves.easeInOutCubic;
+
+  /// Spring-like bounce for emphasis
+  static const Curve spring = Curves.elasticOut;
+
+  /// Organic breathing animations (idle pulses, gentle waves)
+  static const Curve organic = Curves.easeInOut;
+
+  /// Decelerate for natural-feeling slides
+  static const Curve decel = Curves.decelerate;
 }

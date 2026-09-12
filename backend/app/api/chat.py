@@ -25,17 +25,24 @@ class ChatResponse(BaseModel):
 from app.core.memory_store import session_memory
 
 @router.post("/", response_model=ChatResponse)
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 async def chat(request: Request, body: ChatRequest):
     result = rag_service.get_answer(query=body.query, session_id=body.session_id)
     return result
 
 @router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
-    success = session_memory.delete_session(session_id)
-    if not success:
-        return {"status": "ok", "message": "Session not found or already deleted"}
+    session_memory.delete_session(session_id)
+    from app.services.kb_service import kb_service
+    kb_service.clean_orphaned_points()
     return {"status": "ok", "message": "Session hard deleted"}
+
+@router.delete("/clear")
+async def clear_all_chats():
+    session_memory.clear_all()
+    from app.services.kb_service import kb_service
+    kb_service.clean_orphaned_points()
+    return {"status": "ok", "message": "All chat history permanently deleted"}
 
 @router.get("/session/{session_id}")
 async def get_session(session_id: str):

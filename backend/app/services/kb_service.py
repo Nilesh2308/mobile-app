@@ -9,7 +9,7 @@ from fastapi import UploadFile
 from app.core.qdrant_client import qdrant_db
 from app.core.config import settings
 from app.core.embeddings import embedding_service
-from app.core.groq_client import groq_service
+from app.core.qwen_client import qwen_service
 from app.services.document_parser import DocumentParser
 from app.services.chunker import RecursiveCharacterTextSplitter
 from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
@@ -20,7 +20,9 @@ class KBService:
     def __init__(self):
         self.chunker = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
         self.data_dir = os.path.join(os.path.dirname(__file__), "../../data")
+        self.uploads_dir = os.path.join(self.data_dir, "uploads")
         os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(self.uploads_dir, exist_ok=True)
         self.summary_file = os.path.join(self.data_dir, "domain_summary.json")
 
     async def process_uploads(self, files: List[UploadFile]) -> Dict[str, Any]:
@@ -48,6 +50,11 @@ class KBService:
                     
                 doc_id = str(uuid.uuid4())
                 upload_time = int(time.time())
+                
+                # Save file to disk
+                file_path = os.path.join(self.uploads_dir, f"{doc_id}_{file.filename}")
+                with open(file_path, "wb") as f:
+                    f.write(content)
                 
                 for i, chunk in enumerate(chunks):
                     all_chunks.append(chunk)
@@ -115,12 +122,12 @@ class KBService:
                 "Based on this, write a short, 2-3 line domain summary describing what this knowledge base is about."
             )
             
-            summary = groq_service.generate_text(
+            summary = qwen_service.generate_text(
                 messages=[
                     {"role": "system", "content": "You are an assistant that summarizes knowledge base domains."},
                     {"role": "user", "content": prompt}
                 ],
-                model=settings.GROQ_FAST_MODEL
+                model=None
             )
             
             # Save to JSON
@@ -157,10 +164,18 @@ class KBService:
             elif doc_id:
                 docs_map[doc_id]["chunk_count"] += 1
                 
-        return list(docs_map.values())
+        # Filter out documents where physical file doesn't exist anymore
+        valid_docs = []
+        for doc in docs_map.values():
+            file_path = os.path.join(self.uploads_dir, f"{doc['doc_id']}_{doc['filename']}")
+            if os.path.exists(file_path):
+                valid_docs.append(doc)
+                
+        return valid_docs
 
     def delete_document(self, doc_id: str) -> bool:
         client = qdrant_db.get_client()
+        from qdrant_client.models import UpdateStatus
         result = client.delete(
             collection_name=qdrant_db.collection_name,
             points_selector=Filter(
@@ -170,11 +185,71 @@ class KBService:
                         match=MatchValue(value=doc_id)
                     )
                 ]
-            )
+            ),
+            wait=True
         )
-        return result.status == "completed"
+        
+        # Also hard delete the physical file
+        try:
+            # We don't have filename easily here, so we find any file starting with doc_id
+            for f in os.listdir(self.uploads_dir):
+                if f.startswith(f"{doc_id}_"):
+                    os.remove(os.path.join(self.uploads_dir, f))
+        except Exception as e:
+            logger.error(f"Failed to delete physical file for doc {doc_id}: {e}")
+
+        # If no documents remain, remove the domain summary
+        remaining_docs = self.list_documents()
+        if not remaining_docs and os.path.exists(self.summary_file):
+            try:
+                os.remove(self.summary_file)
+                logger.info("KB is now empty. Removed domain_summary.json.")
+            except Exception as e:
+                logger.error(f"Failed to remove domain summary file: {e}")
+            
+        self.clean_orphaned_points()
+        return result.status == UpdateStatus.COMPLETED
+
+    def clean_orphaned_points(self):
+        try:
+            client = qdrant_db.get_client()
+            records, _ = client.scroll(
+                collection_name=qdrant_db.collection_name,
+                limit=10000,
+                with_payload=True,
+                with_vectors=False
+            )
+            valid_doc_ids = set()
+            if os.path.exists(self.uploads_dir):
+                for f in os.listdir(self.uploads_dir):
+                    if "_" in f:
+                        valid_doc_ids.add(f.split("_")[0])
+                        
+            points_to_delete = []
+            for r in records:
+                doc_id = r.payload.get("doc_id") if r.payload else None
+                if not doc_id or doc_id not in valid_doc_ids:
+                    points_to_delete.append(r.id)
+                    
+            if points_to_delete:
+                client.delete(
+                    collection_name=qdrant_db.collection_name,
+                    points_selector=points_to_delete,
+                    wait=True
+                )
+                logger.info(f"Cleaned {len(points_to_delete)} orphaned points from Qdrant.")
+        except Exception as e:
+            logger.error(f"Failed to clean orphaned points: {e}")
 
     def get_domain_summary(self) -> str:
+        if not self.list_documents():
+            if os.path.exists(self.summary_file):
+                try:
+                    os.remove(self.summary_file)
+                except Exception:
+                    pass
+            return ""
+
         try:
             if os.path.exists(self.summary_file):
                 with open(self.summary_file, "r", encoding="utf-8") as f:

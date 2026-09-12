@@ -8,7 +8,10 @@ class DocumentParser:
         reader = PdfReader(io.BytesIO(file_bytes))
         text = ""
         for page in reader.pages:
-            extracted = page.extract_text()
+            try:
+                extracted = page.extract_text(extraction_mode="layout")
+            except Exception:
+                extracted = page.extract_text()
             if extracted:
                 text += extracted + "\n"
         return text

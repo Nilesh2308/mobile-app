@@ -1,3 +1,5 @@
+export 'animated_audio_bars.dart';
+export 'animated_gradient_bg.dart';
 export 'app_badge.dart';
 export 'app_button.dart';
 export 'app_card.dart';
@@ -9,6 +11,7 @@ export 'app_toast.dart';
 export 'app_top_bar.dart';
 export 'chat_bubble.dart';
 export 'delete_document_modal.dart';
+export 'glass_container.dart';
 export 'permission_denied_card.dart';
 export 'typing_indicator.dart';
 export 'voice_waveform_ring.dart';

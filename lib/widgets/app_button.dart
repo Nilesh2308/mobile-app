@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
@@ -19,7 +20,8 @@ enum AppButtonSize {
   lg,
 }
 
-/// Reusable SaaS button with micro-interactions, states, and variants.
+/// Premium SaaS button with gradient fill, neon glow, shimmer effects,
+/// and micro-interaction press feedback.
 class AppButton extends StatefulWidget {
   const AppButton({
     super.key,
@@ -56,6 +58,7 @@ class _AppButtonState extends State<AppButton> {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Dimensions by size
     final double height;
@@ -89,41 +92,56 @@ class _AppButtonState extends State<AppButton> {
     Color foregroundColor;
     Border? border;
     List<BoxShadow>? shadows;
+    Gradient? gradient;
 
     switch (widget.variant) {
       case AppButtonVariant.primary:
         backgroundColor = colors.primary;
-        foregroundColor = colors.onPrimary;
+        foregroundColor = Colors.white;
         border = null;
+        gradient = const LinearGradient(
+          colors: AppColors.brandGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
         if (!_effectiveDisabled) {
-          shadows = [
-            BoxShadow(
-              color: colors.primary.withValues(alpha: 0.24),
-              offset: const Offset(0, 2),
-              blurRadius: 6,
-            ),
-          ];
+          shadows = AppShadows.neonGlow(
+            colors.primary,
+            intensity: 0.25,
+            blur: 12,
+          );
         }
         break;
       case AppButtonVariant.secondary:
-        backgroundColor = colors.surfaceSecondary;
+        backgroundColor = isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : colors.surfaceSecondary;
         foregroundColor = colors.textPrimary;
-        border = Border.all(color: colors.borderSubtle, width: 1);
+        border = Border.all(
+          color: isDark ? colors.glassBorder : colors.borderSubtle,
+          width: 1,
+        );
+        gradient = null;
         break;
       case AppButtonVariant.outline:
         backgroundColor = AppColors.transparent;
         foregroundColor = colors.textPrimary;
         border = Border.all(color: colors.borderStrong, width: 1);
+        gradient = null;
         break;
       case AppButtonVariant.ghost:
-        backgroundColor = _isPressed ? colors.surfaceSecondary : AppColors.transparent;
+        backgroundColor = _isPressed
+            ? (isDark ? Colors.white.withValues(alpha: 0.06) : colors.surfaceSecondary)
+            : AppColors.transparent;
         foregroundColor = colors.textPrimary;
         border = null;
+        gradient = null;
         break;
       case AppButtonVariant.destructive:
         backgroundColor = colors.errorContainer;
         foregroundColor = colors.error;
         border = Border.all(color: colors.error.withValues(alpha: 0.3), width: 1);
+        gradient = null;
         break;
     }
 
@@ -156,8 +174,32 @@ class _AppButtonState extends State<AppButton> {
       ],
     );
 
+    Widget button = Container(
+      height: height,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: gradient == null ? backgroundColor : null,
+        gradient: gradient,
+        borderRadius: AppRadius.borderR12,
+        border: border,
+        boxShadow: shadows,
+      ),
+      child: content,
+    );
+
+    // Add shimmer to primary buttons
+    if (widget.variant == AppButtonVariant.primary && !_effectiveDisabled) {
+      button = button
+          .animate(onPlay: (c) => c.repeat())
+          .shimmer(
+            duration: 3000.ms,
+            color: Colors.white.withValues(alpha: 0.1),
+            delay: 1000.ms,
+          );
+    }
+
     return AnimatedScale(
-      scale: _isPressed && !_effectiveDisabled ? 0.975 : 1.0,
+      scale: _isPressed && !_effectiveDisabled ? 0.96 : 1.0,
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOutCubic,
       child: AnimatedOpacity(
@@ -172,17 +214,7 @@ class _AppButtonState extends State<AppButton> {
                   widget.onPressed?.call();
                 },
           onTapCancel: _effectiveDisabled ? null : () => setState(() => _isPressed = false),
-          child: Container(
-            height: height,
-            padding: padding,
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: AppRadius.borderR12,
-              border: border,
-              boxShadow: shadows,
-            ),
-            child: content,
-          ),
+          child: button,
         ),
       ),
     );

@@ -3,7 +3,7 @@ from app.core.qdrant_client import qdrant_db
 from app.core.embeddings import embedding_service
 from app.core.stt import stt_service
 from app.core.tts import tts_service
-from app.core.groq_client import groq_service
+from app.core.qwen_client import qwen_service
 
 router = APIRouter()
 
@@ -16,7 +16,7 @@ async def health_check():
             "embeddings": False,
             "whisper": False,
             "kokoro": False,
-            "groq": False
+            "qwen": False
         }
     }
 
@@ -41,15 +41,16 @@ async def health_check():
     else:
         health_status["status"] = "degraded"
 
-    # Check Kokoro
-    if tts_service.pipeline is not None:
-        health_status["components"]["kokoro"] = True
+    # Check TTS (Edge-TTS or Kokoro)
+    from app.core.tts import EDGE_TTS_AVAILABLE
+    if (tts_service.engine == "edge" and EDGE_TTS_AVAILABLE) or tts_service.pipeline is not None:
+        health_status["components"]["tts"] = True
     else:
         health_status["status"] = "degraded"
         
-    # Check Groq
-    if groq_service.client is not None:
-        health_status["components"]["groq"] = True
+    # Check Qwen
+    if qwen_service.api_key is not None:
+        health_status["components"]["qwen"] = True
     else:
         health_status["status"] = "degraded"
 

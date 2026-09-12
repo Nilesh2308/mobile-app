@@ -115,7 +115,7 @@ class ApiClient {
         return ApiResponse.failure('No audio file provided to sendVoiceChat');
       }
 
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 45));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 90));
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
@@ -224,6 +224,14 @@ class ApiClient {
   Future<void> resetSession(String sessionId) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/chat/session/$sessionId');
+      await http.delete(uri).timeout(_defaultTimeout);
+    } catch (_) {}
+  }
+
+  /// Hard-delete all chat history on backend database
+  Future<void> clearAllChats() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/chat/clear');
       await http.delete(uri).timeout(_defaultTimeout);
     } catch (_) {}
   }

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -5,9 +6,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/chat_message.dart';
 import '../theme/theme.dart';
 import 'app_badge.dart';
+import 'animated_audio_bars.dart';
 
-/// Custom-built SaaS chat bubble distinguishing user, knowledge base,
-/// general LLM, and refused responses with animated citations and markdown.
+/// Premium SaaS chat bubble with gradient user messages, glassmorphism bot cards,
+/// animated citations, and inline audio waveform visualization.
 class ChatBubble extends StatefulWidget {
   const ChatBubble({
     super.key,
@@ -46,7 +48,7 @@ class _ChatBubbleState extends State<ChatBubble> {
     }
   }
 
-  /// 1. User Message: Right-aligned, primary brand accent bubble
+  /// 1. User Message: Gradient-filled, right-aligned with neon glow
   Widget _buildUserBubble(ChatMessage msg, AppThemeColors colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
@@ -54,59 +56,64 @@ class _ChatBubbleState extends State<ChatBubble> {
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 300),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s16,
-                    vertical: AppSpacing.s12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(AppRadius.r16),
-                      topRight: Radius.circular(AppRadius.r16),
-                      bottomLeft: Radius.circular(AppRadius.r16),
-                      bottomRight: Radius.circular(AppRadius.r4),
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s16,
+                      vertical: AppSpacing.s12,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.primary.withValues(alpha: 0.22),
-                        offset: const Offset(0, 2),
-                        blurRadius: 8,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: AppColors.userBubbleGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                  child: Text(
-                    msg.text,
-                    style: AppTextStyles.bodyMedium(
-                      color: colors.onPrimary,
-                      fontWeight: FontWeight.w400,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(AppRadius.r16),
+                        topRight: Radius.circular(AppRadius.r16),
+                        bottomLeft: Radius.circular(AppRadius.r16),
+                        bottomRight: Radius.circular(AppRadius.r4),
+                      ),
+                      boxShadow: AppShadows.neonGlow(
+                        AppColors.primary500,
+                        intensity: 0.2,
+                        blur: 16,
+                      ),
+                    ),
+                    child: Text(
+                      msg.text,
+                      style: AppTextStyles.bodyMedium(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
                   ),
-                ),
-                AppSpacing.vGap4,
-                Text(
-                  _formatTime(msg.timestamp),
-                  style: AppTextStyles.caption(color: colors.textMuted),
-                ),
-              ],
+                  AppSpacing.vGap4,
+                  Text(
+                    _formatTime(msg.timestamp),
+                    style: AppTextStyles.caption(color: colors.textMuted),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     )
         .animate()
-        .fadeIn(duration: 180.ms, curve: Curves.easeOut)
-        .slideY(begin: 0.08, end: 0, duration: 180.ms, curve: Curves.easeOutCubic);
+        .fadeIn(duration: 200.ms, curve: Curves.easeOut)
+        .slideX(begin: 0.05, end: 0, duration: 200.ms, curve: Curves.easeOutCubic);
   }
 
-  /// 2. Bot Message: Left-aligned, neutral card-style bubble with Markdown & source badge
+  /// 2. Bot Message: Glassmorphism card with animated avatar
   Widget _buildBotBubble(ChatMessage msg, AppThemeColors colors) {
     final isKnowledgeBase = msg.source == 'knowledge_base';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.s6),
@@ -114,33 +121,37 @@ class _ChatBubbleState extends State<ChatBubble> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Bot Avatar Icon
+          // Bot Avatar with gradient background
           Container(
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              color: isKnowledgeBase ? colors.primaryContainer : colors.surfaceSecondary,
-              borderRadius: AppRadius.borderR8,
-              border: Border.all(
-                color: isKnowledgeBase
-                    ? colors.primary.withValues(alpha: 0.25)
-                    : colors.borderSubtle,
-                width: 1,
+              gradient: LinearGradient(
+                colors: isKnowledgeBase
+                    ? [AppColors.auroraViolet, AppColors.primary500]
+                    : [colors.surfaceElevated, colors.surfaceSecondary],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: AppRadius.borderR10,
+              boxShadow: isKnowledgeBase
+                  ? AppShadows.neonGlow(AppColors.auroraViolet, intensity: 0.15, blur: 8)
+                  : null,
             ),
             child: Icon(
               isKnowledgeBase ? LucideIcons.sparkles : LucideIcons.bot,
               size: 16,
-              color: isKnowledgeBase ? colors.primary : colors.textSecondary,
+              color: isKnowledgeBase ? Colors.white : colors.textSecondary,
             ),
           ),
           AppSpacing.hGap10,
 
           // Bubble Content Column
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 310),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header badge based on source
                 if (isKnowledgeBase) ...[
@@ -159,40 +170,60 @@ class _ChatBubbleState extends State<ChatBubble> {
                   AppSpacing.vGap6,
                 ],
 
-                // Card Container with Markdown Body
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s16,
-                    vertical: AppSpacing.s12,
+                // Glassmorphism Card Container with Markdown Body
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(AppRadius.r4),
+                    topRight: Radius.circular(AppRadius.r16),
+                    bottomLeft: Radius.circular(AppRadius.r16),
+                    bottomRight: Radius.circular(AppRadius.r16),
                   ),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(AppRadius.r4),
-                      topRight: Radius.circular(AppRadius.r16),
-                      bottomLeft: Radius.circular(AppRadius.r16),
-                      bottomRight: Radius.circular(AppRadius.r16),
-                    ),
-                    border: Border.all(color: colors.borderSubtle, width: 1),
-                  ),
-                  child: MarkdownBody(
-                    data: msg.text,
-                    selectable: true,
-                    styleSheet: MarkdownStyleSheet(
-                      p: AppTextStyles.bodyMedium(color: colors.textPrimary),
-                      strong: AppTextStyles.bodyMedium(
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w700,
+                  child: BackdropFilter(
+                    filter: isDark
+                        ? ImageFilter.blur(sigmaX: 16, sigmaY: 16)
+                        : ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s16,
+                        vertical: AppSpacing.s12,
                       ),
-                      em: AppTextStyles.bodyMedium(
-                        color: colors.textPrimary,
-                      ).copyWith(fontStyle: FontStyle.italic),
-                      listBullet: AppTextStyles.bodyMedium(color: colors.primary),
-                      code: AppTextStyles.mono(color: colors.primary),
-                      codeblockDecoration: BoxDecoration(
-                        color: colors.surfaceSecondary,
-                        borderRadius: AppRadius.borderR8,
-                        border: Border.all(color: colors.borderSubtle, width: 1),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : colors.surface,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(AppRadius.r4),
+                          topRight: Radius.circular(AppRadius.r16),
+                          bottomLeft: Radius.circular(AppRadius.r16),
+                          bottomRight: Radius.circular(AppRadius.r16),
+                        ),
+                        border: Border.all(
+                          color: isDark
+                              ? colors.glassBorder
+                              : colors.borderSubtle,
+                          width: 1,
+                        ),
+                      ),
+                      child: MarkdownBody(
+                        data: msg.text,
+                        selectable: true,
+                        styleSheet: MarkdownStyleSheet(
+                          p: AppTextStyles.bodyMedium(color: colors.textPrimary),
+                          strong: AppTextStyles.bodyMedium(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          em: AppTextStyles.bodyMedium(
+                            color: colors.textPrimary,
+                          ).copyWith(fontStyle: FontStyle.italic),
+                          listBullet: AppTextStyles.bodyMedium(color: colors.primary),
+                          code: AppTextStyles.mono(color: colors.primary),
+                          codeblockDecoration: BoxDecoration(
+                            color: colors.surfaceSecondary,
+                            borderRadius: AppRadius.borderR8,
+                            border: Border.all(color: colors.borderSubtle, width: 1),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -204,21 +235,29 @@ class _ChatBubbleState extends State<ChatBubble> {
                   _buildCitationsAccordion(msg.citations, colors),
                 ],
 
-                // Audio Playback / Replay Bar (if audio was returned by Kokoro TTS)
+                // Audio Playback Bar with animated waveform
                 if (msg.audioBase64 != null && widget.onPlayAudio != null) ...[
                   AppSpacing.vGap6,
                   GestureDetector(
                     onTap: widget.isAudioPlaying ? widget.onStopAudio : widget.onPlayAudio,
                     behavior: HitTestBehavior.opaque,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s8),
                       decoration: BoxDecoration(
-                        color: widget.isAudioPlaying
-                            ? colors.primary.withValues(alpha: 0.15)
-                            : colors.surfaceSecondary,
-                        borderRadius: AppRadius.borderR8,
+                        gradient: widget.isAudioPlaying
+                            ? LinearGradient(
+                                colors: [
+                                  colors.primary.withValues(alpha: 0.15),
+                                  AppColors.auroraViolet.withValues(alpha: 0.1),
+                                ],
+                              )
+                            : null,
+                        color: widget.isAudioPlaying ? null : colors.surfaceSecondary,
+                        borderRadius: AppRadius.borderR10,
                         border: Border.all(
-                          color: widget.isAudioPlaying ? colors.primary : colors.borderSubtle,
+                          color: widget.isAudioPlaying
+                              ? colors.primary.withValues(alpha: 0.4)
+                              : colors.borderSubtle,
                           width: 1,
                         ),
                       ),
@@ -231,12 +270,27 @@ class _ChatBubbleState extends State<ChatBubble> {
                             color: widget.isAudioPlaying ? colors.primary : colors.textPrimary,
                           ),
                           AppSpacing.hGap6,
-                          Text(
-                            widget.isAudioPlaying ? 'Playing Audio...' : 'Replay Spoken Audio',
-                            style: AppTextStyles.caption(
-                              color: widget.isAudioPlaying ? colors.primary : colors.textPrimary,
-                            ).copyWith(fontWeight: FontWeight.w600),
-                          ),
+                          if (widget.isAudioPlaying)
+                            SizedBox(
+                              width: 60,
+                              height: 16,
+                              child: AnimatedAudioBars(
+                                barCount: 12,
+                                barWidth: 2,
+                                maxBarHeight: 14,
+                                minBarHeight: 3,
+                                gradientColors: [colors.primary, AppColors.auroraViolet],
+                                isActive: true,
+                                speed: 1.2,
+                              ),
+                            )
+                          else
+                            Text(
+                              'Replay Audio',
+                              style: AppTextStyles.caption(
+                                color: colors.textPrimary,
+                              ).copyWith(fontWeight: FontWeight.w600),
+                            ),
                         ],
                       ),
                     ),
@@ -251,15 +305,16 @@ class _ChatBubbleState extends State<ChatBubble> {
               ],
             ),
           ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 180.ms, curve: Curves.easeOut)
-        .slideY(begin: 0.08, end: 0, duration: 180.ms, curve: Curves.easeOutCubic);
+        ),
+      ],
+    ),
+  )
+      .animate()
+        .fadeIn(duration: 200.ms, curve: Curves.easeOut)
+        .slideX(begin: -0.05, end: 0, duration: 200.ms, curve: Curves.easeOutCubic);
   }
 
-  /// 3. Refused Query: Centered pill/chip warning message signaling "this wasn't answered"
+  /// 3. Refused Query: Animated warning card with pulse border
   Widget _buildRefusedBubble(ChatMessage msg, AppThemeColors colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s16),
@@ -281,7 +336,12 @@ class _ChatBubbleState extends State<ChatBubble> {
               Container(
                 padding: AppSpacing.p6,
                 decoration: BoxDecoration(
-                  color: colors.warning.withValues(alpha: 0.15),
+                  gradient: LinearGradient(
+                    colors: [
+                      colors.warning.withValues(alpha: 0.2),
+                      colors.warning.withValues(alpha: 0.1),
+                    ],
+                  ),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(LucideIcons.shieldAlert, size: 16, color: colors.warning),
@@ -318,15 +378,19 @@ class _ChatBubbleState extends State<ChatBubble> {
       ),
     )
         .animate()
-        .fadeIn(duration: 180.ms)
-        .slideY(begin: 0.05, end: 0, duration: 180.ms, curve: Curves.easeOutCubic);
+        .fadeIn(duration: 200.ms)
+        .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1), duration: 250.ms, curve: Curves.easeOutCubic);
   }
 
-  /// Expandable Citations Section
+  /// Expandable Citations Section with gradient accents
   Widget _buildCitationsAccordion(List<Citation> citations, AppThemeColors colors) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: colors.surfaceSecondary,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : colors.surfaceSecondary,
         borderRadius: AppRadius.borderR10,
         border: Border.all(color: colors.borderSubtle, width: 1),
       ),
@@ -372,7 +436,9 @@ class _ChatBubbleState extends State<ChatBubble> {
                     margin: const EdgeInsets.only(top: AppSpacing.s6),
                     padding: AppSpacing.p8,
                     decoration: BoxDecoration(
-                      color: colors.surface,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.03)
+                          : colors.surface,
                       borderRadius: AppRadius.borderR8,
                       border: Border.all(color: colors.borderSubtle, width: 1),
                     ),

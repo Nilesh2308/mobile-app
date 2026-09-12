@@ -1,8 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/document_item.dart';
 import '../services/api_client.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../config.dart';
 import '../theme/theme.dart';
 import '../widgets/widgets.dart';
 
@@ -63,21 +66,15 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       if (docRes.isSuccess && docRes.data != null) {
         _documents = docRes.data!;
       } else {
-        // Fallback demo documents if backend is currently unreachable
-        _documents = [
-          const DocumentItem(
-            docId: 'acme_policy_01',
-            filename: 'acme_hr_policy_handbook.txt',
-            uploadTimestamp: 1773072000,
-            chunkCount: 18,
-          ),
-          const DocumentItem(
-            docId: 'travel_policy_02',
-            filename: 'travel_and_expense_policy_2026.pdf',
-            uploadTimestamp: 1773158400,
-            chunkCount: 42,
-          ),
-        ];
+        _documents = [];
+        if (mounted) {
+          AppToast.show(
+            context,
+            title: 'Connection Error',
+            message: 'Could not load documents from backend. Check your server connection.',
+            variant: AppToastVariant.error,
+          );
+        }
       }
     });
   }
@@ -104,7 +101,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         _activeUploads.insertAll(0, tasks);
       });
 
-      // Prepare files for multipart upload
       final filePaths = <String>[];
       final inMemoryFiles = <Map<String, dynamic>>[];
 
@@ -117,7 +113,6 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
         }
       }
 
-      // Transition to processing state
       for (final t in tasks) {
         setState(() {
           t.status = FileUploadStatus.processing;
@@ -148,10 +143,8 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           variant: AppToastVariant.success,
         );
 
-        // Refresh list and domain summary
         await _loadData();
 
-        // Clear active tasks after delay
         Future.delayed(const Duration(seconds: 4), () {
           if (mounted) {
             setState(() {
@@ -185,6 +178,51 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     }
   }
 
+  Future<void> _openDocument(DocumentItem doc) async {
+    final rawUrl = '${AppConfig.baseUrl}/api/kb/documents/${doc.docId}/download';
+    final uri = Uri.parse(rawUrl);
+
+    try {
+      // 1. Try external browser or viewer app
+      bool launched = false;
+      try {
+        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+
+      // 2. Fallback to in-app browser view
+      if (!launched) {
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+        } catch (_) {}
+      }
+
+      // 3. Fallback to platform default
+      if (!launched) {
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+        } catch (_) {}
+      }
+
+      if (!launched && mounted) {
+        AppToast.show(
+          context,
+          title: 'Cannot Open Document',
+          message: 'Could not launch browser or PDF viewer on this device.',
+          variant: AppToastVariant.error,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(
+          context,
+          title: 'Cannot Open Document',
+          message: 'Error launching document: $e',
+          variant: AppToastVariant.error,
+        );
+      }
+    }
+  }
+
   Future<void> _handleDelete(DocumentItem doc) async {
     final confirmed = await DeleteDocumentModal.show(
       context: context,
@@ -214,6 +252,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (_isLoading && _documents.isEmpty) {
       return const AppLoadingState(
@@ -227,19 +266,22 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       color: colors.primary,
       backgroundColor: colors.surface,
       child: ListView(
-        padding: AppSpacing.screenPadding,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s16,
+          vertical: AppSpacing.s16,
+        ),
         children: [
-          // 1. Prominent Upload Area Card
-          _buildUploadDropZone(colors),
+          // 1. Animated Upload Area Card
+          _buildUploadDropZone(colors, isDark),
           AppSpacing.vGap20,
 
-          // 3. Active Uploads Progress Tracking (if any)
+          // 2. Active Uploads Progress Tracking (if any)
           if (_activeUploads.isNotEmpty) ...[
-            _buildActiveUploadsList(colors),
+            _buildActiveUploadsList(colors, isDark),
             AppSpacing.vGap20,
           ],
 
-          // 4. Document List Header
+          // 3. Document List Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -267,7 +309,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           ),
           AppSpacing.vGap12,
 
-          // 5. Document List / Empty State
+          // 4. Document List / Empty State
           if (_documents.isEmpty && _activeUploads.isEmpty)
             AppEmptyState(
               title: 'No documents yet',
@@ -278,9 +320,21 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
               onActionPressed: _pickAndUploadFiles,
             )
           else
-            ..._documents.map((doc) => Padding(
+            ..._documents.asMap().entries.map((entry) => Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-                  child: _buildDocumentCard(doc, colors),
+                  child: _buildDocumentCard(entry.value, colors, isDark)
+                      .animate()
+                      .fadeIn(
+                        duration: 200.ms,
+                        delay: Duration(milliseconds: entry.key * 60),
+                      )
+                      .slideY(
+                        begin: 0.05,
+                        end: 0,
+                        duration: 200.ms,
+                        delay: Duration(milliseconds: entry.key * 60),
+                        curve: Curves.easeOutCubic,
+                      ),
                 )),
 
           AppSpacing.vGap32,
@@ -289,39 +343,60 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     );
   }
 
-  /// Prominent Upload Area Card
-  Widget _buildUploadDropZone(AppThemeColors colors) {
+  /// Premium animated Upload Area with gradient border and floating cloud icon
+  Widget _buildUploadDropZone(AppThemeColors colors, bool isDark) {
     return GestureDetector(
       onTap: _pickAndUploadFiles,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s24),
         decoration: BoxDecoration(
-          color: colors.surface,
+          gradient: LinearGradient(
+            colors: isDark
+                ? [
+                    colors.primary.withValues(alpha: 0.06),
+                    AppColors.auroraViolet.withValues(alpha: 0.04),
+                  ]
+                : [
+                    colors.primaryContainer.withValues(alpha: 0.5),
+                    colors.surface,
+                  ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: AppRadius.borderR16,
           border: Border.all(
-            color: colors.borderStrong,
+            color: colors.primary.withValues(alpha: isDark ? 0.25 : 0.2),
             width: 1.5,
           ),
         ),
         child: Column(
           children: [
+            // Animated floating cloud icon
             Container(
-              width: 52,
-              height: 52,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: AppRadius.borderR14,
-                border: Border.all(
-                  color: colors.primary.withValues(alpha: 0.25),
-                  width: 1,
+                gradient: LinearGradient(
+                  colors: [
+                    colors.primary.withValues(alpha: 0.2),
+                    AppColors.auroraViolet.withValues(alpha: 0.15),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: AppRadius.borderR16,
+                boxShadow: isDark
+                    ? AppShadows.neonGlow(colors.primary, intensity: 0.1, blur: 12)
+                    : null,
               ),
               child: Icon(
                 LucideIcons.cloudUpload,
-                size: 24,
+                size: 26,
                 color: colors.primary,
               ),
-            ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .moveY(begin: 0, end: -4, duration: 1800.ms, curve: Curves.easeInOut),
             AppSpacing.vGap12,
             Text(
               'Tap to upload documents',
@@ -350,8 +425,8 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     );
   }
 
-  /// Active Uploads Progress Card Group
-  Widget _buildActiveUploadsList(AppThemeColors colors) {
+  /// Active Uploads Progress Card Group with gradient progress bars
+  Widget _buildActiveUploadsList(AppThemeColors colors, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -365,48 +440,80 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
               child: Container(
                 padding: AppSpacing.p12,
                 decoration: BoxDecoration(
-                  color: colors.surfaceSecondary,
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : colors.surfaceSecondary,
                   borderRadius: AppRadius.borderR12,
-                  border: Border.all(color: colors.borderSubtle, width: 1),
+                  border: Border.all(
+                    color: isDark ? colors.glassBorder : colors.borderSubtle,
+                    width: 1,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            _buildFileIcon(task.name, colors, size: 16),
-                            AppSpacing.hGap8,
-                            Text(
-                              task.name,
-                              style: AppTextStyles.bodyMedium(
-                                color: colors.textPrimary,
-                                fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              _buildFileIcon(task.name, colors, size: 16),
+                              AppSpacing.hGap8,
+                              Expanded(
+                                child: Text(
+                                  task.name,
+                                  style: AppTextStyles.bodyMedium(
+                                    color: colors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        AppSpacing.hGap8,
                         _buildStatusBadge(task, colors),
                       ],
                     ),
                     AppSpacing.vGap8,
+                    // Gradient progress bar
                     ClipRRect(
                       borderRadius: AppRadius.borderRFull,
-                      child: LinearProgressIndicator(
-                        value: task.status == FileUploadStatus.done
-                            ? 1.0
-                            : (task.status == FileUploadStatus.processing ? null : task.progress),
-                        minHeight: 4,
-                        backgroundColor: colors.borderSubtle,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          task.status == FileUploadStatus.error
-                              ? colors.error
-                              : (task.status == FileUploadStatus.done ? colors.success : colors.primary),
-                        ),
+                      child: SizedBox(
+                        height: 4,
+                        child: task.status == FileUploadStatus.processing
+                            ? LinearProgressIndicator(
+                                minHeight: 4,
+                                backgroundColor: colors.borderSubtle,
+                                valueColor: AlwaysStoppedAnimation<Color>(colors.primary),
+                              )
+                            : Stack(
+                                children: [
+                                  Container(
+                                    height: 4,
+                                    color: colors.borderSubtle,
+                                  ),
+                                  FractionallySizedBox(
+                                    widthFactor: task.status == FileUploadStatus.done
+                                        ? 1.0
+                                        : task.progress,
+                                    child: Container(
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: task.status == FileUploadStatus.error
+                                              ? [colors.error, colors.error]
+                                              : task.status == FileUploadStatus.done
+                                                  ? [colors.success, AppColors.auroraTeal]
+                                                  : [colors.primary, AppColors.auroraViolet],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   ],
@@ -422,7 +529,7 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       case FileUploadStatus.uploading:
         return const AppBadge(label: 'Uploading...', variant: AppBadgeVariant.neutral);
       case FileUploadStatus.processing:
-        return const AppBadge(label: 'Chunking & Embedding...', variant: AppBadgeVariant.brand);
+        return const AppBadge(label: 'Indexing...', variant: AppBadgeVariant.brand);
       case FileUploadStatus.done:
         return const AppBadge(label: 'Indexed', variant: AppBadgeVariant.success);
       case FileUploadStatus.error:
@@ -430,12 +537,16 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     }
   }
 
-  /// Clean Card-List Document Item
-  Widget _buildDocumentCard(DocumentItem doc, AppThemeColors colors) {
-    return AppCard(
-      child: Row(
-        children: [
-          _buildFileIcon(doc.filename, colors, size: 22),
+  /// Document Card with glassmorphism styling
+  Widget _buildDocumentCard(DocumentItem doc, AppThemeColors colors, bool isDark) {
+    return InkWell(
+      onTap: () => _openDocument(doc),
+      borderRadius: AppRadius.borderR16,
+      child: AppCard(
+        useGlass: isDark,
+        child: Row(
+          children: [
+            _buildFileIcon(doc.filename, colors, size: 22),
           AppSpacing.hGap12,
           Expanded(
             child: Column(
@@ -475,36 +586,33 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
             onPressed: () => _handleDelete(doc),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  /// Differentiates PDF, DOCX, and TXT icons cleanly
+  /// Differentiates PDF, DOCX, and TXT icons with gradient containers
   Widget _buildFileIcon(String filename, AppThemeColors colors, {double size = 20}) {
     final ext = filename.split('.').last.toLowerCase();
 
-    Color iconColor;
-    Color bgColor;
+    List<Color> gradientColors;
     IconData icon;
 
     switch (ext) {
       case 'pdf':
-        iconColor = const Color(0xFFEF4444); // Rose red
-        bgColor = const Color(0xFFEF4444).withValues(alpha: 0.12);
+        gradientColors = [const Color(0xFFEF4444), const Color(0xFFDC2626)];
         icon = LucideIcons.fileText;
         break;
       case 'docx':
       case 'doc':
-        iconColor = const Color(0xFF2563EB); // Royal blue
-        bgColor = const Color(0xFF2563EB).withValues(alpha: 0.12);
+        gradientColors = [const Color(0xFF2563EB), const Color(0xFF3B82F6)];
         icon = LucideIcons.fileCode2;
         break;
       case 'txt':
       default:
-        iconColor = colors.primary;
-        bgColor = colors.primaryContainer;
+        gradientColors = [colors.primary, AppColors.auroraViolet];
         icon = LucideIcons.fileText;
         break;
     }
@@ -512,10 +620,18 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
     return Container(
       padding: AppSpacing.p10,
       decoration: BoxDecoration(
-        color: bgColor,
+        gradient: LinearGradient(
+          colors: gradientColors.map((c) => c.withValues(alpha: 0.15)).toList(),
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: AppRadius.borderR10,
+        border: Border.all(
+          color: gradientColors.first.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
-      child: Icon(icon, size: size, color: iconColor),
+      child: Icon(icon, size: size, color: gradientColors.first),
     );
   }
 

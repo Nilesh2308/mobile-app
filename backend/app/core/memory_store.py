@@ -66,6 +66,16 @@ class SessionMemory:
         finally:
             conn.close()
 
+    def clear_all(self):
+        conn = db.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM messages")
+            conn.commit()
+            return cursor.rowcount
+        finally:
+            conn.close()
+
     def evict_stale_sessions(self, max_age_seconds: int = 1800):
         # We can implement cleanup logic later if needed for the mobile app, 
         # but persistent means we might not want to automatically evict everything.

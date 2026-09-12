@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
@@ -33,21 +34,43 @@ class _VoiceScreenState extends State<VoiceScreen> {
   String? _currentlyPlayingMessageId;
   StreamSubscription? _playerStateSubscription;
 
-  final List<ChatMessage> _messages = [];
+  // VAD (Voice Activity Detection) & Automatic Silence Detection
+  Timer? _silenceCheckTimer;
+  Timer? _maxRecordingTimer;
+  DateTime? _silenceStartTime;
+  DateTime? _recordingStartTime;
+  double _peakDb = -160.0;
+  bool _hasDetectedSpeech = false;
+  bool _isAutoEnding = false;
+  bool _isProcessingRecording = false;
+  int _speechTickCount = 0;
+  int _secondsUntilAutoStop = 3;
+
+  // Sensitive speech threshold (-48 dB catches regular & soft speaking voice)
+  static const double _speechThresholdDb = -48.0;
+  static const Duration _silenceAutoStopDuration = Duration(milliseconds: 3000);
+  static const Duration _maxRecordingDuration = Duration(seconds: 45);
 
   // Status subtitle display text
   String get _statusLabel {
     switch (_voiceState) {
       case VoiceRingState.listening:
-        return 'Listening...';
+        if (_isAutoEnding) {
+          return 'Pause detected. Generating answer...';
+        } else if (_hasDetectedSpeech && _secondsUntilAutoStop <= 2 && _secondsUntilAutoStop > 0) {
+          return 'Listening... (auto-sending in ${_secondsUntilAutoStop}s)';
+        } else if (_hasDetectedSpeech) {
+          return 'Listening... Speak your question';
+        }
+        return 'Listening... Speak now';
       case VoiceRingState.transcribing:
-        return 'Transcribing...';
+        return 'Transcribing your voice...';
       case VoiceRingState.thinking:
-        return 'Thinking...';
+        return 'Thinking & searching documents...';
       case VoiceRingState.speaking:
-        return 'Speaking...';
+        return 'Speaking response...';
       case VoiceRingState.idle:
-        return 'Tap microphone to speak';
+        return 'Tap the microphone to speak';
     }
   }
 
@@ -74,6 +97,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   @override
   void dispose() {
+    _cancelSilenceDetection();
     _playerStateSubscription?.cancel();
     _audioPlayer.dispose();
     _audioRecorder.dispose();
@@ -85,7 +109,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<bool> _checkPermission() async {
     if (kIsWeb) return true;
 
-    // Check with permission_handler
     final status = await Permission.microphone.status;
     if (status.isGranted) {
       if (_isMicPermissionDenied) {
@@ -108,14 +131,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   /// Toggle recording on / off
   Future<void> _toggleRecording() async {
-    // If currently playing audio, stop it
     if (_voiceState == VoiceRingState.speaking) {
       await _stopAudio();
       return;
     }
 
-    // Disallow toggling during transcription / thinking
-    if (_voiceState == VoiceRingState.transcribing || _voiceState == VoiceRingState.thinking) {
+    if (_voiceState == VoiceRingState.transcribing ||
+        _voiceState == VoiceRingState.thinking ||
+        _isProcessingRecording) {
       return;
     }
 
@@ -126,7 +149,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
   }
 
-  /// Start capturing audio from microphone
+  /// Start capturing audio from microphone with automatic silence detection
   Future<void> _startRecording() async {
     final hasPerm = await _checkPermission();
     if (!hasPerm) return;
@@ -146,9 +169,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
         path: recordingPath ?? '',
       );
 
+      _recordingStartTime = DateTime.now();
+      _silenceStartTime = null;
+      _peakDb = -160.0;
+      _speechTickCount = 0;
+      _secondsUntilAutoStop = 3;
+      _hasDetectedSpeech = false;
+      _isAutoEnding = false;
+      _isProcessingRecording = false;
+
       setState(() {
         _voiceState = VoiceRingState.listening;
       });
+
+      _startSilenceDetector();
     } catch (e) {
       if (mounted) {
         AppToast.show(
@@ -162,23 +196,140 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
   }
 
+  /// Starts periodic direct native amplitude polling and auto-stops on 3-second silence
+  void _startSilenceDetector() {
+    _cancelSilenceDetection();
+
+    _peakDb = -160.0;
+    _speechTickCount = 0;
+    _secondsUntilAutoStop = 3;
+    _silenceStartTime = null;
+
+    _silenceCheckTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
+      if (_voiceState != VoiceRingState.listening || _isProcessingRecording) {
+        return;
+      }
+
+      try {
+        final amp = await _audioRecorder.getAmplitude();
+        final currentDb = (amp.current > -150.0) ? amp.current : amp.max;
+
+        if (currentDb > _peakDb) {
+          _peakDb = currentDb;
+        }
+
+        final isSpeaking = currentDb >= _speechThresholdDb &&
+            (currentDb >= _peakDb - 9.0 || _peakDb <= -42.0);
+
+        if (isSpeaking) {
+          _speechTickCount++;
+          if (_speechTickCount >= 2) {
+            _hasDetectedSpeech = true;
+          }
+          _silenceStartTime = null;
+          if (_secondsUntilAutoStop != 3 && mounted) {
+            setState(() {
+              _secondsUntilAutoStop = 3;
+              _isAutoEnding = false;
+            });
+          }
+        } else {
+          if (_hasDetectedSpeech) {
+            _silenceStartTime ??= DateTime.now();
+            final silenceElapsed = DateTime.now().difference(_silenceStartTime!);
+            final remainingSec = 3 - (silenceElapsed.inMilliseconds ~/ 1000);
+
+            if (silenceElapsed >= _silenceAutoStopDuration) {
+              _isAutoEnding = true;
+              if (mounted) setState(() {});
+              _stopAndProcessRecording();
+              return;
+            } else if (remainingSec != _secondsUntilAutoStop && remainingSec >= 0) {
+              if (mounted && !_isAutoEnding) {
+                setState(() {
+                  _secondsUntilAutoStop = remainingSec;
+                });
+              }
+            }
+          } else {
+            if (_recordingStartTime != null &&
+                DateTime.now().difference(_recordingStartTime!) >= const Duration(seconds: 12)) {
+              _stopRecordingWithoutProcessing();
+            }
+          }
+        }
+      } catch (_) {
+        if (_recordingStartTime != null && _hasDetectedSpeech) {
+          final elapsed = DateTime.now().difference(_recordingStartTime!);
+          if (elapsed >= const Duration(seconds: 10)) {
+            _stopAndProcessRecording();
+          }
+        }
+      }
+    });
+
+    _maxRecordingTimer = Timer(_maxRecordingDuration, () {
+      if (_voiceState == VoiceRingState.listening && !_isProcessingRecording) {
+        _stopAndProcessRecording();
+      }
+    });
+  }
+
+  void _cancelSilenceDetection() {
+    _silenceCheckTimer?.cancel();
+    _silenceCheckTimer = null;
+    _maxRecordingTimer?.cancel();
+    _maxRecordingTimer = null;
+  }
+
+  Future<void> _stopRecordingWithoutProcessing() async {
+    _cancelSilenceDetection();
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _voiceState = VoiceRingState.idle;
+        _isAutoEnding = false;
+        _isProcessingRecording = false;
+      });
+      AppToast.show(
+        context,
+        title: 'Listening Cancelled',
+        message: 'No speech detected after 12 seconds.',
+        variant: AppToastVariant.info,
+      );
+    }
+  }
+
   /// Stop recording and send audio to backend
   Future<void> _stopAndProcessRecording() async {
+    if (_isProcessingRecording) return;
+    _isProcessingRecording = true;
+    _cancelSilenceDetection();
+
     try {
       final path = await _audioRecorder.stop();
       if (path == null && !kIsWeb) {
-        setState(() => _voiceState = VoiceRingState.idle);
+        setState(() {
+          _voiceState = VoiceRingState.idle;
+          _isProcessingRecording = false;
+          _isAutoEnding = false;
+        });
         return;
       }
 
       setState(() {
         _voiceState = VoiceRingState.transcribing;
+        _isAutoEnding = false;
       });
 
-      if (!mounted) return;
+      if (!mounted) {
+        _isProcessingRecording = false;
+        return;
+      }
       final sessionProvider = context.read<SessionProvider>();
 
-      // Send to FastAPI /api/voice/chat
       List<int>? fileBytes;
       if (path != null && !kIsWeb) {
         final file = File(path);
@@ -187,7 +338,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
         }
       }
 
-      // Transition visual cue to "Thinking..."
       Timer(const Duration(milliseconds: 900), () {
         if (mounted && _voiceState == VoiceRingState.transcribing) {
           setState(() => _voiceState = VoiceRingState.thinking);
@@ -200,7 +350,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
         sessionId: sessionProvider.sessionId,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        _isProcessingRecording = false;
+        return;
+      }
 
       if (response.isSuccess && response.data != null) {
         final data = response.data!;
@@ -215,72 +368,55 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
         final botMsgId = 'bot_${DateTime.now().millisecondsSinceEpoch}';
 
-        setState(() {
-          _messages.add(ChatMessage(
-            id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-            text: queryText,
-            isUser: true,
-            timestamp: DateTime.now(),
-          ));
+        sessionProvider.addVoiceMessage(ChatMessage(
+          id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+          text: queryText,
+          isUser: true,
+          timestamp: DateTime.now(),
+        ));
 
-          _messages.add(ChatMessage(
-            id: botMsgId,
-            text: answerText,
-            isUser: false,
-            timestamp: DateTime.now(),
-            source: source,
-            citations: citationsList,
-            audioBase64: audioBase64,
-          ));
-        });
+        sessionProvider.addVoiceMessage(ChatMessage(
+          id: botMsgId,
+          text: answerText,
+          isUser: false,
+          timestamp: DateTime.now(),
+          source: source,
+          citations: citationsList,
+          audioBase64: audioBase64,
+        ));
 
         _scrollToBottom();
+        _isProcessingRecording = false;
 
-        // Auto-play synthesized voice output
         if (audioBase64 != null && audioBase64.isNotEmpty) {
           await _playAudio(audioBase64, botMsgId);
         } else {
           setState(() => _voiceState = VoiceRingState.idle);
         }
       } else {
-        // Fallback for offline demonstration
-        _handleOfflineFallback();
+        _isProcessingRecording = false;
+        setState(() => _voiceState = VoiceRingState.idle);
+        if (mounted) {
+          AppToast.show(
+            context,
+            title: 'Voice Error',
+            message: response.error ?? 'Could not process voice query. Please verify backend connection.',
+            variant: AppToastVariant.error,
+          );
+        }
       }
     } catch (e) {
+      _isProcessingRecording = false;
       if (mounted) {
-        _handleOfflineFallback();
+        setState(() => _voiceState = VoiceRingState.idle);
+        AppToast.show(
+          context,
+          title: 'Voice Error',
+          message: 'Error processing voice: $e',
+          variant: AppToastVariant.error,
+        );
       }
     }
-  }
-
-  void _handleOfflineFallback() {
-    final botMsgId = 'bot_${DateTime.now().millisecondsSinceEpoch}';
-    setState(() {
-      _messages.add(ChatMessage(
-        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-        text: 'What is our remote work equipment allowance?',
-        isUser: true,
-        timestamp: DateTime.now(),
-      ));
-
-      _messages.add(ChatMessage(
-        id: botMsgId,
-        text: 'According to Section 4.2 of the **Acme HR Policy Handbook**, full-time employees are eligible for a **\$500 one-time reimbursement** for ergonomic home office furniture upon hire, and an annual **\$300 refresh allowance**.',
-        isUser: false,
-        timestamp: DateTime.now(),
-        source: 'knowledge_base',
-        citations: const [
-          Citation(
-            filename: 'acme_hr_policy_handbook.txt',
-            chunkText: 'Section 4.2 - Remote Equipment Reimbursement: Full-time employees receive a one-time \$500 work-from-home setup stipend and an annual \$300 ergonomic allowance.',
-            score: 0.914,
-          ),
-        ],
-        audioBase64: 'mock_audio_sample',
-      ));
-      _voiceState = VoiceRingState.idle;
-    });
-    _scrollToBottom();
   }
 
   /// Play audio from base64 string
@@ -294,7 +430,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
       });
 
       if (base64String == 'mock_audio_sample') {
-        // Mock timer for UI testing without crashing WAV decoder
         Timer(const Duration(seconds: 3), () {
           if (mounted) {
             setState(() {
@@ -346,9 +481,43 @@ class _VoiceScreenState extends State<VoiceScreen> {
     });
   }
 
+  Color _getStateColor(AppThemeColors colors) {
+    switch (_voiceState) {
+      case VoiceRingState.listening:
+        return AppColors.neonMagenta;
+      case VoiceRingState.transcribing:
+        return AppColors.neonOrange;
+      case VoiceRingState.thinking:
+        return AppColors.neonCyan;
+      case VoiceRingState.speaking:
+        return AppColors.neonGreen;
+      case VoiceRingState.idle:
+        return colors.primary;
+    }
+  }
+
+  List<Color> _getOrbGradient() {
+    switch (_voiceState) {
+      case VoiceRingState.listening:
+        return AppColors.voiceListeningGradient;
+      case VoiceRingState.transcribing:
+        return AppColors.voiceTranscribingGradient;
+      case VoiceRingState.thinking:
+        return AppColors.voiceThinkingGradient;
+      case VoiceRingState.speaking:
+        return AppColors.voiceSpeakingGradient;
+      case VoiceRingState.idle:
+        return AppColors.voiceIdleGradient;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
+    final sessionProvider = context.watch<SessionProvider>();
+    final messages = sessionProvider.voiceMessages;
+    final stateColor = _getStateColor(colors);
+    final orbGradient = _getOrbGradient();
 
     return Column(
       children: [
@@ -361,55 +530,49 @@ class _VoiceScreenState extends State<VoiceScreen> {
             ),
           ),
 
-        // Focal Mic Button & Concentric Pulsing Waveforms
+        // Focal Mic Button & Premium Animated Voice Orb
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
           child: Column(
             children: [
               VoiceWaveformRing(
                 state: _voiceState,
-                diameter: 96,
+                diameter: 100,
                 child: GestureDetector(
                   onTap: _toggleRecording,
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 240),
+                    duration: const Duration(milliseconds: 280),
                     curve: Curves.easeOutCubic,
-                    width: 96,
-                    height: 96,
+                    width: 100,
+                    height: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
-                        colors: _voiceState == VoiceRingState.listening
-                            ? [colors.error, colors.error.withValues(alpha: 0.85)]
-                            : (_voiceState == VoiceRingState.speaking
-                                ? [colors.success, colors.success.withValues(alpha: 0.85)]
-                                : [colors.primary, const Color(0xFF4F46E5)]),
+                        colors: orbGradient,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (_voiceState == VoiceRingState.listening
-                                  ? colors.error
-                                  : (_voiceState == VoiceRingState.speaking ? colors.success : colors.primary))
-                              .withValues(alpha: 0.4),
-                          offset: const Offset(0, 6),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                      boxShadow: AppShadows.neonGlow(
+                        stateColor,
+                        intensity: _voiceState == VoiceRingState.idle ? 0.2 : 0.45,
+                        blur: _voiceState == VoiceRingState.idle ? 16 : 28,
+                      ),
                     ),
                     child: Center(
-                      child: Icon(
-                        _voiceState == VoiceRingState.listening
-                            ? LucideIcons.square
-                            : (_voiceState == VoiceRingState.speaking
-                                ? LucideIcons.volume2
-                                : (_voiceState == VoiceRingState.transcribing || _voiceState == VoiceRingState.thinking
-                                    ? LucideIcons.loader2
-                                    : LucideIcons.mic)),
-                        size: 38,
-                        color: Colors.white,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          _voiceState == VoiceRingState.listening
+                              ? LucideIcons.square
+                              : (_voiceState == VoiceRingState.speaking
+                                  ? LucideIcons.volume2
+                                  : (_voiceState == VoiceRingState.transcribing || _voiceState == VoiceRingState.thinking
+                                      ? LucideIcons.loader2
+                                      : LucideIcons.mic)),
+                          key: ValueKey(_voiceState),
+                          size: 38,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -417,19 +580,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
               ),
               AppSpacing.vGap12,
 
-              // Multi-Stage Dynamic Status Description Text
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s24),
-                child: Text(
-                  _statusLabel,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.bodyMedium(
-                    color: _voiceState == VoiceRingState.listening
-                        ? colors.error
-                        : (_voiceState == VoiceRingState.speaking
-                            ? colors.success
-                            : (_voiceState != VoiceRingState.idle ? colors.primary : colors.textSecondary)),
-                    fontWeight: FontWeight.w600,
+              // Animated status text
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: Padding(
+                  key: ValueKey(_statusLabel),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s24),
+                  child: Text(
+                    _statusLabel,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodyMedium(
+                      color: stateColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -437,18 +600,33 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
         ),
 
-        const Divider(height: 1, thickness: 1),
+        // Gradient divider
+        Container(
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.transparent,
+                stateColor.withValues(alpha: 0.3),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
 
-        // Conversation Message List Area (reusing ChatBubble)
+        // Conversation Message List Area
         Expanded(
-          child: _messages.isEmpty
+          child: messages.isEmpty
               ? _buildVoiceEmptyState(colors)
               : ListView.builder(
                   controller: _scrollController,
-                  padding: AppSpacing.screenPadding,
-                  itemCount: _messages.length,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s16,
+                    vertical: AppSpacing.s12,
+                  ),
+                  itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    final msg = _messages[index];
+                    final msg = messages[index];
                     return ChatBubble(
                       message: msg,
                       onPlayAudio: msg.audioBase64 != null ? () => _playAudio(msg.audioBase64, msg.id) : null,
@@ -471,25 +649,35 @@ class _VoiceScreenState extends State<VoiceScreen> {
           children: [
             Icon(
               LucideIcons.audioWaveform,
-              size: 28,
-              color: colors.primary.withValues(alpha: 0.6),
-            ),
-            AppSpacing.vGap12,
+              size: 32,
+              color: colors.primary.withValues(alpha: 0.5),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(0.9, 0.9),
+                  end: const Offset(1.1, 1.1),
+                  duration: 2000.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(begin: 0.5, end: 1.0, duration: 2000.ms),
+            AppSpacing.vGap16,
             Text(
               'Voice Assistant Ready',
-              style: AppTextStyles.headingSmall(color: colors.textPrimary),
+              style: AppTextStyles.headingMedium(color: colors.textPrimary),
               textAlign: TextAlign.center,
             ),
-            AppSpacing.vGap6,
+            AppSpacing.vGap8,
             Text(
-              'Tap the microphone above to speak your question aloud.',
+              'Tap the microphone above to speak your question.\nThe assistant auto-detects when you pause.',
               style: AppTextStyles.bodySmall(color: colors.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.05, end: 0, duration: 400.ms, curve: Curves.easeOutCubic);
   }
 }
-

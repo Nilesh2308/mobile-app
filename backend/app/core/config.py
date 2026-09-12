@@ -2,15 +2,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 class Settings(BaseSettings):
-    # Groq Settings
-    GROQ_API_KEY: str = ""
-    GROQ_LLM_MODEL: str = "openai/gpt-oss-20b"
-    GROQ_FAST_MODEL: str = "openai/gpt-oss-20b"
+    # Qwen Settings
+    QWEN_API_KEY: str = "sk-34d333c1a2d74d7abd13a38bf8b8abe1"
+    QWEN_LLM_MODEL: str = "qwen3-14b"
+    QWEN_API_URL: str = "https://chat.theonetechnologies.co.in/api/chat/completions"
 
     # AI Models Settings
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
     WHISPER_MODEL_SIZE: str = "small"
-    KOKORO_VOICE: str = "af_heart" # Default voice
+    WHISPER_BEAM_SIZE: int = 1
+    TTS_ENGINE: str = "edge" # "edge" (fast ~1s) or "kokoro"
+    EDGE_TTS_VOICE: str = "en-US-AvaNeural"
+    KOKORO_VOICE: str = "af_heart" # Default kokoro voice
 
     # Qdrant Settings
     QDRANT_URL: str = "http://localhost:6333"
@@ -19,7 +22,7 @@ class Settings(BaseSettings):
 
     # App Settings
     ALLOWED_ORIGINS: str = "http://localhost:3000"
-    RELEVANCE_SCORE_THRESHOLD: float = 0.55
+    RELEVANCE_SCORE_THRESHOLD: float = 0.30
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -56,6 +56,92 @@ abstract final class AppColors {
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
   static const Color transparent = Color(0x00000000);
+
+  // ─── NEON GLOW COLORS (Voice States) ─────────────────────────
+  static const Color neonCyan = Color(0xFF00E5FF);
+  static const Color neonMagenta = Color(0xFFFF006E);
+  static const Color neonPurple = Color(0xFFBB86FC);
+  static const Color neonBlue = Color(0xFF4D7CFF);
+  static const Color neonGreen = Color(0xFF00E676);
+  static const Color neonOrange = Color(0xFFFF9100);
+  static const Color auroraViolet = Color(0xFF7C4DFF);
+  static const Color auroraTeal = Color(0xFF1DE9B6);
+
+  // ─── GRADIENT PRESETS ─────────────────────────────────────────
+
+  /// Dark mesh background gradients (organic, alive)
+  static const List<Color> meshDarkBase = [
+    Color(0xFF050510), // Deep space
+    Color(0xFF0A0A1F), // Midnight indigo
+    Color(0xFF0D0820), // Dark violet
+    Color(0xFF060612), // Ink
+  ];
+
+  /// Light mesh background gradients (subtle, elegant)
+  static const List<Color> meshLightBase = [
+    Color(0xFFF8F9FF), // Soft lavender white
+    Color(0xFFEEF0FF), // Pale indigo
+    Color(0xFFF5F3FF), // Light violet
+    Color(0xFFF0F4FF), // Ice blue
+  ];
+
+  /// Voice idle gradient (calm purple/blue aura)
+  static const List<Color> voiceIdleGradient = [
+    Color(0xFF4F46E5), // Indigo
+    Color(0xFF7C3AED), // Violet
+    Color(0xFF6366F1), // Primary
+  ];
+
+  /// Voice listening gradient (hot red/magenta pulse)
+  static const List<Color> voiceListeningGradient = [
+    Color(0xFFFF006E), // Hot magenta
+    Color(0xFFFF3D71), // Coral
+    Color(0xFFFF1744), // Red accent
+  ];
+
+  /// Voice transcribing gradient (amber/orange spin)
+  static const List<Color> voiceTranscribingGradient = [
+    Color(0xFFFF9100), // Orange
+    Color(0xFFFFC107), // Amber
+    Color(0xFFFFAB00), // Gold
+  ];
+
+  /// Voice thinking gradient (cyan/blue pulse)
+  static const List<Color> voiceThinkingGradient = [
+    Color(0xFF00B8D4), // Cyan
+    Color(0xFF4D7CFF), // Electric blue
+    Color(0xFF6366F1), // Indigo
+  ];
+
+  /// Voice speaking gradient (emerald/teal wave)
+  static const List<Color> voiceSpeakingGradient = [
+    Color(0xFF00E676), // Neon green
+    Color(0xFF1DE9B6), // Aurora teal
+    Color(0xFF00BFA5), // Teal
+  ];
+
+  /// User chat bubble gradient
+  static const List<Color> userBubbleGradient = [
+    Color(0xFF6366F1), // Primary
+    Color(0xFF7C3AED), // Violet
+  ];
+
+  /// Brand accent gradient (for buttons, highlights)
+  static const List<Color> brandGradient = [
+    Color(0xFF6366F1), // Primary
+    Color(0xFF818CF8), // Primary 400
+    Color(0xFF7C3AED), // Violet accent
+  ];
+
+  // ─── GLASSMORPHISM TOKENS ─────────────────────────────────────
+  static const double glassBlurSigma = 24.0;
+  static const double glassBlurLight = 16.0;
+  static const double glassBlurHeavy = 40.0;
+
+  static const Color glassDarkOverlay = Color(0x1AFFFFFF); // 10% white
+  static const Color glassDarkBorder = Color(0x33FFFFFF); // 20% white
+  static const Color glassLightOverlay = Color(0x80FFFFFF); // 50% white
+  static const Color glassLightBorder = Color(0x4DFFFFFF); // 30% white
 }
 
 /// ThemeExtension providing semantic theme colors for Light and Dark modes.
@@ -83,6 +169,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     required this.error,
     required this.errorContainer,
     required this.onErrorContainer,
+    required this.glassOverlay,
+    required this.glassBorder,
+    required this.meshColors,
   });
 
   final Color primary;
@@ -107,6 +196,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
   final Color error;
   final Color errorContainer;
   final Color onErrorContainer;
+  final Color glassOverlay;
+  final Color glassBorder;
+  final List<Color> meshColors;
 
   /// Light theme color palette
   static const light = AppThemeColors(
@@ -132,20 +224,23 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     error: AppColors.error,
     errorContainer: AppColors.errorLight,
     onErrorContainer: AppColors.errorDark,
+    glassOverlay: AppColors.glassLightOverlay,
+    glassBorder: AppColors.glassLightBorder,
+    meshColors: AppColors.meshLightBase,
   );
 
   /// Dark theme color palette (Linear/Vercel sleek dark style)
   static const dark = AppThemeColors(
     primary: AppColors.primary400,
     onPrimary: AppColors.gray950,
-    primaryContainer: Color(0xFF1E1E38),
+    primaryContainer: Color(0xFF1A1A35),
     onPrimaryContainer: AppColors.primary200,
-    background: AppColors.gray950,
-    surface: Color(0xFF111114),
-    surfaceSecondary: Color(0xFF18181D),
-    surfaceElevated: Color(0xFF1F1F26),
-    borderSubtle: Color(0xFF272730),
-    borderStrong: Color(0xFF3F3F4E),
+    background: Color(0xFF050510),
+    surface: Color(0xFF0C0C1A),
+    surfaceSecondary: Color(0xFF12122A),
+    surfaceElevated: Color(0xFF181830),
+    borderSubtle: Color(0xFF1E1E3A),
+    borderStrong: Color(0xFF2E2E50),
     textPrimary: AppColors.gray50,
     textSecondary: AppColors.gray400,
     textMuted: AppColors.gray500,
@@ -158,6 +253,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     error: Color(0xFFF87171),
     errorContainer: Color(0xFF450A0A),
     onErrorContainer: Color(0xFFFECACA),
+    glassOverlay: AppColors.glassDarkOverlay,
+    glassBorder: AppColors.glassDarkBorder,
+    meshColors: AppColors.meshDarkBase,
   );
 
   /// Access colors via `AppThemeColors.of(context)`
@@ -190,6 +288,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
     Color? error,
     Color? errorContainer,
     Color? onErrorContainer,
+    Color? glassOverlay,
+    Color? glassBorder,
+    List<Color>? meshColors,
   }) {
     return AppThemeColors(
       primary: primary ?? this.primary,
@@ -214,6 +315,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       error: error ?? this.error,
       errorContainer: errorContainer ?? this.errorContainer,
       onErrorContainer: onErrorContainer ?? this.onErrorContainer,
+      glassOverlay: glassOverlay ?? this.glassOverlay,
+      glassBorder: glassBorder ?? this.glassBorder,
+      meshColors: meshColors ?? this.meshColors,
     );
   }
 
@@ -246,6 +350,9 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
       error: Color.lerp(error, other.error, t)!,
       errorContainer: Color.lerp(errorContainer, other.errorContainer, t)!,
       onErrorContainer: Color.lerp(onErrorContainer, other.onErrorContainer, t)!,
+      glassOverlay: Color.lerp(glassOverlay, other.glassOverlay, t)!,
+      glassBorder: Color.lerp(glassBorder, other.glassBorder, t)!,
+      meshColors: meshColors, // Lists don't lerp linearly
     );
   }
 }

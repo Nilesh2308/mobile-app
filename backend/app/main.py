@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_allowed_origins
 from app.core.qdrant_client import qdrant_db
-from app.core.groq_client import groq_service
+from app.core.qwen_client import qwen_service
 from app.core.embeddings import embedding_service
 from app.core.stt import stt_service
 from app.core.tts import tts_service
@@ -29,8 +29,7 @@ async def lifespan(app: FastAPI):
     # 1. Connect to Qdrant
     qdrant_db.connect()
     
-    # 2. Connect to Groq
-    groq_service.connect()
+    # 2. Qwen is initialized upon instance creation
     
     # 3. Load Embedding Model
     embedding_service.load_model()

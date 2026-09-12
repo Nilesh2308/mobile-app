@@ -6,7 +6,8 @@ import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import 'app_button.dart';
 
-/// Specially designed empty state with icon badge, title, explanation, and action CTA.
+/// Premium empty state with animated floating icon, gradient glow,
+/// and action CTA.
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
     super.key,
@@ -28,6 +29,7 @@ class AppEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppThemeColors.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Center(
       child: Padding(
@@ -36,25 +38,46 @@ class AppEmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Icon container with soft tint and subtle border
+            // Animated floating icon with gradient glow
             Container(
-              width: 56,
-              height: 56,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                color: colors.surfaceSecondary,
-                borderRadius: AppRadius.borderR16,
-                border: Border.all(color: colors.borderSubtle, width: 1),
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [
+                          AppColors.auroraViolet.withValues(alpha: 0.15),
+                          colors.primary.withValues(alpha: 0.1),
+                        ]
+                      : [
+                          colors.primaryContainer,
+                          AppColors.primary50,
+                        ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: AppRadius.borderR20,
+                border: Border.all(
+                  color: colors.primary.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+                boxShadow: isDark
+                    ? AppShadows.neonGlow(colors.primary, intensity: 0.1, blur: 16)
+                    : null,
               ),
               child: Icon(
                 icon,
-                size: 26,
-                color: colors.textSecondary,
+                size: 28,
+                color: colors.primary,
               ),
-            ),
-            AppSpacing.vGap16,
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .moveY(begin: 0, end: -6, duration: 2000.ms, curve: Curves.easeInOut),
+            AppSpacing.vGap20,
+            // Gradient-shimmer title text
             Text(
               title,
-              style: AppTextStyles.headingSmall(color: colors.textPrimary),
+              style: AppTextStyles.headingMedium(color: colors.textPrimary),
               textAlign: TextAlign.center,
             ),
             AppSpacing.vGap8,
@@ -79,8 +102,8 @@ class AppEmptyState extends StatelessWidget {
           ],
         )
             .animate()
-            .fadeIn(duration: 200.ms, curve: Curves.easeOut)
-            .slideY(begin: 0.05, end: 0, duration: 200.ms, curve: Curves.easeOut),
+            .fadeIn(duration: 300.ms, curve: Curves.easeOut)
+            .slideY(begin: 0.08, end: 0, duration: 300.ms, curve: Curves.easeOutCubic),
       ),
     );
   }
