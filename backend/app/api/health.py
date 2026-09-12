@@ -14,11 +14,18 @@ async def health_check():
         "components": {
             "qdrant": False,
             "embeddings": False,
-            "whisper": False,
-            "kokoro": False,
+            "stt": False,
+            "tts": False,
             "qwen": False
+        },
+        "engines": {
+            "stt": "groq-cloud-whisper",
+            "tts": "microsoft-edge-tts",
+            "db": "qdrant-cloud",
+            "llm": "qwen3-14b"
         }
     }
+
 
     # Check Qdrant
     try:
@@ -38,7 +45,7 @@ async def health_check():
     # Check STT (Groq Cloud Whisper or local Whisper)
     try:
         if getattr(stt_service, "groq_client", None) is not None or getattr(stt_service, "local_model", None) is not None or getattr(stt_service, "model", None) is not None:
-            health_status["components"]["whisper"] = True
+            health_status["components"]["stt"] = True
         else:
             health_status["status"] = "degraded"
     except Exception:
