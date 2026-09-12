@@ -127,7 +127,7 @@ class TTSWrapper:
     def synthesize(self, text: str) -> bytes:
         """
         Synchronous wrapper: prioritize Edge-TTS (ultra-fast, <1.5s),
-        fallback to Kokoro if offline or on failure.
+        fallback to Kokoro if available locally, or return empty audio gracefully.
         """
         if self.engine == "edge" and EDGE_TTS_AVAILABLE:
             try:
@@ -142,10 +142,16 @@ class TTSWrapper:
                 except RuntimeError:
                     return asyncio.run(self._synthesize_edge(text))
             except Exception as e:
-                logger.warning(f"Edge-TTS failed ({e}), falling back to Kokoro...")
-                return self._synthesize_kokoro(text)
+                logger.error(f"Edge-TTS failed: {e}", exc_info=True)
+                if KOKORO_AVAILABLE and self.pipeline is not None:
+                    return self._synthesize_kokoro(text)
+                logger.warning("Kokoro is not loaded or available for fallback. Proceeding without audio.")
+                return b""
         else:
-            return self._synthesize_kokoro(text)
+            if KOKORO_AVAILABLE and self.pipeline is not None:
+                return self._synthesize_kokoro(text)
+            logger.warning("No TTS engine available.")
+            return b""
 
     async def synthesize_async(self, text: str) -> bytes:
         """Asynchronous synthesis for direct async FastAPI routes."""
@@ -153,11 +159,18 @@ class TTSWrapper:
             try:
                 return await self._synthesize_edge(text)
             except Exception as e:
-                logger.warning(f"Edge-TTS async failed ({e}), falling back to Kokoro...")
+                logger.error(f"Edge-TTS async failed: {e}", exc_info=True)
+                if KOKORO_AVAILABLE and self.pipeline is not None:
+                    from fastapi.concurrency import run_in_threadpool
+                    return await run_in_threadpool(self._synthesize_kokoro, text)
+                logger.warning("Kokoro is not loaded or available for fallback. Proceeding without audio.")
+                return b""
+        else:
+            if KOKORO_AVAILABLE and self.pipeline is not None:
                 from fastapi.concurrency import run_in_threadpool
                 return await run_in_threadpool(self._synthesize_kokoro, text)
-        else:
-            from fastapi.concurrency import run_in_threadpool
-            return await run_in_threadpool(self._synthesize_kokoro, text)
+            logger.warning("No TTS engine available.")
+            return b""
 
 tts_service = TTSWrapper()
+

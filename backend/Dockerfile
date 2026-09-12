@@ -7,11 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install minimal OS dependencies for audio handling and health checks
+# Install minimal OS dependencies for audio handling, SSL certs, and health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Copy production requirements
 COPY requirements-prod.txt .

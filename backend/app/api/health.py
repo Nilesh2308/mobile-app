@@ -64,9 +64,16 @@ async def health_check():
     else:
         health_status["status"] = "degraded"
 
-    if health_status["status"] == "degraded":
-        # We can still return 200, or 503 depending on requirements.
-        # Returning 200 with degraded status is common for partial outages.
-        pass
-
     return health_status
+ 
+
+@router.get("/test-tts")
+async def test_tts_endpoint():
+    try:
+        from app.core.tts import tts_service
+        data = await tts_service.synthesize_async("Hello! Voice synthesis is fully working in the cloud.")
+        return {"status": "ok", "audio_bytes": len(data), "engine": tts_service.engine}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+
