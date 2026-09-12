@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import '../config.dart';
 import '../providers/session_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_client.dart';
@@ -26,45 +25,8 @@ class SettingsModal extends StatefulWidget {
 }
 
 class _SettingsModalState extends State<SettingsModal> {
-  late final TextEditingController _urlController;
   final ApiClient _apiClient = const ApiClient();
-  bool _isTesting = false;
-  String? _testResult;
-  bool _isSuccess = false;
   bool _isClearing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _urlController = TextEditingController(text: AppConfig.baseUrl);
-  }
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _testConnection() async {
-    setState(() {
-      _isTesting = true;
-      _testResult = null;
-    });
-
-    await AppConfig.setBaseUrl(_urlController.text);
-    const client = ApiClient();
-    final health = await client.checkHealth();
-
-    if (!mounted) return;
-
-    setState(() {
-      _isTesting = false;
-      _isSuccess = health.isSuccess;
-      _testResult = health.isSuccess
-          ? 'Connected successfully! Models ready.'
-          : health.error ?? 'Connection failed';
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +88,7 @@ class _SettingsModalState extends State<SettingsModal> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('App Settings & Network', style: AppTextStyles.headingSmall(color: colors.textPrimary)),
+                    Text('App Settings', style: AppTextStyles.headingSmall(color: colors.textPrimary)),
                     IconButton(
                       icon: const Icon(LucideIcons.x, size: 18),
                       color: colors.textSecondary,
@@ -192,85 +154,46 @@ class _SettingsModalState extends State<SettingsModal> {
                 ),
                 AppSpacing.vGap16,
 
-                // Backend Endpoint Configuration
-                AppCard(
-                  useGlass: isDark,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('FastAPI Backend URL', style: AppTextStyles.label(color: colors.textPrimary)),
-                      AppSpacing.vGap6,
-                      Text(
-                        'When testing on a physical phone, set to your computer\'s Wi-Fi IP (e.g. http://192.168.x.x:8000).',
-                        style: AppTextStyles.caption(color: colors.textSecondary),
+                // Cloud Backend Status (Read-only SaaS info)
+                _buildSettingsCard(
+                  colors: colors,
+                  isDark: isDark,
+                  icon: LucideIcons.cloud,
+                  title: 'Cloud Backend',
+                  subtitle: 'Render & Qdrant Cloud (24/7)',
+                  action: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colors.success.withValues(alpha: 0.12),
+                      borderRadius: AppRadius.borderRFull,
+                      border: Border.all(
+                        color: colors.success.withValues(alpha: 0.35),
+                        width: 1,
                       ),
-                      AppSpacing.vGap12,
-                      AppTextField(
-                        controller: _urlController,
-                        hintText: 'http://192.168.1.100:8000',
-                        prefixIcon: LucideIcons.globe,
-                      ),
-                      if (_testResult != null) ...[
-                        AppSpacing.vGap8,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         Container(
-                          padding: AppSpacing.p8,
+                          width: 6,
+                          height: 6,
                           decoration: BoxDecoration(
-                            color: _isSuccess
-                                ? colors.success.withValues(alpha: 0.1)
-                                : colors.error.withValues(alpha: 0.1),
-                            borderRadius: AppRadius.borderR8,
-                            border: Border.all(
-                              color: _isSuccess ? colors.success.withValues(alpha: 0.3) : colors.error.withValues(alpha: 0.3),
-                              width: 1,
-                            ),
+                            color: colors.success,
+                            shape: BoxShape.circle,
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _isSuccess ? LucideIcons.checkCircle : LucideIcons.alertTriangle,
-                                size: 14,
-                                color: _isSuccess ? colors.success : colors.error,
-                              ),
-                              AppSpacing.hGap8,
-                              Expanded(
-                                child: Text(
-                                  _testResult!,
-                                  style: AppTextStyles.caption(color: _isSuccess ? colors.success : colors.error),
-                                ),
-                              ),
-                            ],
+                        ),
+                        AppSpacing.hGap6,
+                        Text(
+                          'Live',
+                          style: AppTextStyles.caption(
+                            color: colors.success,
                           ),
                         ),
                       ],
-                      AppSpacing.vGap12,
-                      Row(
-                        children: [
-                          AppButton(
-                            text: 'Test & Save',
-                            size: AppButtonSize.sm,
-                            variant: AppButtonVariant.primary,
-                            leadingIcon: LucideIcons.radio,
-                            isLoading: _isTesting,
-                            onPressed: _testConnection,
-                          ),
-                          AppSpacing.hGap8,
-                          AppButton(
-                            text: 'Reset Default',
-                            size: AppButtonSize.sm,
-                            variant: AppButtonVariant.ghost,
-                            onPressed: () async {
-                              await AppConfig.resetToDefault();
-                              _urlController.text = AppConfig.baseUrl;
-                              setState(() => _testResult = null);
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 AppSpacing.vGap16,
-
               ],
             ),
           ),
