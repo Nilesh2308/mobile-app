@@ -96,7 +96,7 @@ class _VoiceWaveformRingState extends State<VoiceWaveformRing>
     final isBusy = widget.state != VoiceRingState.idle;
     final gradient = _getStateGradient();
     final primaryColor = _getStatePrimaryColor();
-    final totalSize = widget.diameter * 2.4;
+    final totalSize = widget.diameter * 2.15;
 
     return Center(
       child: SizedBox(

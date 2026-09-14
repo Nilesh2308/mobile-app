@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'config.dart';
 import 'providers/session_provider.dart';
 import 'providers/theme_provider.dart';
-import 'screens/main_shell.dart';
+import 'screens/splash_screen.dart';
 import 'services/session_service.dart';
 import 'theme/theme.dart';
 
@@ -32,7 +32,9 @@ void main() async {
 }
 
 class VoiceAiApp extends StatelessWidget {
-  const VoiceAiApp({super.key});
+  final Widget? home;
+
+  const VoiceAiApp({super.key, this.home});
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +46,7 @@ class VoiceAiApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeProvider.themeMode,
-      home: const MainShell(),
+      home: home ?? const SplashScreen(),
     );
   }
 }

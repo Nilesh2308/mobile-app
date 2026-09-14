@@ -34,10 +34,11 @@ class STTWrapper:
 
 
     def load_model(self):
-        # 1. Initialize Groq Cloud Whisper client if API key is provided
-        if GROQ_AVAILABLE and settings.GROQ_API_KEY:
+        # 1. Initialize Groq Cloud Whisper client
+        groq_key = getattr(settings, "GROQ_API_KEY", "")
+        if GROQ_AVAILABLE and groq_key:
             try:
-                self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
+                self.groq_client = Groq(api_key=groq_key)
                 logger.info(f"Groq Cloud Whisper STT initialized (Model: {self.groq_model})")
             except Exception as e:
                 logger.warning(f"Could not initialize primary Groq client: {e}")
@@ -70,16 +71,20 @@ class STTWrapper:
             if self.engine == "faster-whisper":
                 raise
 
-    def transcribe(self, audio_bytes: bytes) -> str:
-        # 1. Attempt Groq Cloud Whisper first (0.2s ultra-fast, 0 MB server RAM)
+    def transcribe(self, audio_bytes: bytes, filename: str = "audio.m4a") -> str:
+        # Ensure Groq is ready
+        if not self.groq_client and GROQ_AVAILABLE:
+            self.load_model()
+
+        # 1. Attempt Groq Cloud Whisper first (0.2s - 0.5s ultra-fast, 0 MB server RAM)
         if self.groq_client:
             try:
-                return self._transcribe_groq(self.groq_client, audio_bytes)
+                return self._transcribe_groq(self.groq_client, audio_bytes, filename)
             except Exception as e:
                 logger.warning(f"Primary Groq STT failed: {e}. Checking backup...")
                 if self.groq_backup_client:
                     try:
-                        return self._transcribe_groq(self.groq_backup_client, audio_bytes)
+                        return self._transcribe_groq(self.groq_backup_client, audio_bytes, filename)
                     except Exception as be:
                         logger.warning(f"Backup Groq STT failed: {be}")
 
@@ -99,9 +104,14 @@ class STTWrapper:
 
         raise RuntimeError("STT transcription failed: No available STT engine (Groq or local).")
 
-    def _transcribe_groq(self, client, audio_bytes: bytes) -> str:
+    def _transcribe_groq(self, client, audio_bytes: bytes, filename: str = "audio.m4a") -> str:
+        ext = filename.split(".")[-1].lower() if "." in filename else "m4a"
+        if ext not in ["m4a", "wav", "mp3", "ogg", "flac", "webm"]:
+            ext = "m4a"
+        upload_name = f"audio.{ext}"
+
         transcription = client.audio.transcriptions.create(
-            file=("audio.wav", audio_bytes),
+            file=(upload_name, audio_bytes),
             model=self.groq_model,
             temperature=0.0
         )

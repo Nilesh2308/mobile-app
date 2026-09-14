@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     GROQ_API_KEY_BACKUP: str = ""
     STT_ENGINE: str = "groq" # "groq" (cloud ~0.2s, 0MB RAM) or "faster-whisper" (local)
     GROQ_WHISPER_MODEL: str = "whisper-large-v3-turbo"
+    GROQ_LLM_MODEL: str = "openai/gpt-oss-20b"
+    USE_GROQ_LLM: bool = True
 
     # AI Models Settings
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-en-v1.5"
@@ -19,6 +21,7 @@ class Settings(BaseSettings):
     WHISPER_BEAM_SIZE: int = 1
     TTS_ENGINE: str = "edge" # "edge" (fast ~1s) or "kokoro"
     EDGE_TTS_VOICE: str = "en-US-AvaNeural"
+    TTS_RATE: str = "+15%"
     KOKORO_VOICE: str = "af_heart" # Default kokoro voice
 
     # Qdrant Settings

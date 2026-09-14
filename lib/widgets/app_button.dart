@@ -163,9 +163,15 @@ class _AppButtonState extends State<AppButton> {
           Icon(widget.leadingIcon, size: iconSize, color: foregroundColor),
           AppSpacing.hGap8,
         ],
-        Text(
-          widget.text,
-          style: textStyle.copyWith(color: foregroundColor),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              widget.text,
+              style: textStyle.copyWith(color: foregroundColor),
+              maxLines: 1,
+            ),
+          ),
         ),
         if (!widget.isLoading && widget.trailingIcon != null) ...[
           AppSpacing.hGap8,

@@ -93,8 +93,8 @@ class _MainShellState extends State<MainShell> {
             GestureDetector(
               onTap: () => themeProvider.toggleTheme(),
               child: Container(
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.06)
@@ -107,19 +107,19 @@ class _MainShellState extends State<MainShell> {
                 ),
                 child: Icon(
                   themeProvider.isDarkMode ? LucideIcons.sun : LucideIcons.moon,
-                  size: 16,
+                  size: 15,
                   color: colors.textPrimary,
                 ),
               ),
             ),
-            AppSpacing.hGap8,
+            AppSpacing.hGap6,
 
             // Settings Modal
             GestureDetector(
               onTap: () => SettingsModal.show(context),
               child: Container(
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.white.withValues(alpha: 0.06)
@@ -132,7 +132,7 @@ class _MainShellState extends State<MainShell> {
                 ),
                 child: Icon(
                   LucideIcons.settings,
-                  size: 16,
+                  size: 15,
                   color: colors.textPrimary,
                 ),
               ),
@@ -171,7 +171,7 @@ class _MainShellState extends State<MainShell> {
             top: false,
             bottom: true,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s6),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: List.generate(_navItems.length, (index) {
@@ -185,8 +185,8 @@ class _MainShellState extends State<MainShell> {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOutCubic,
-                        margin: const EdgeInsets.symmetric(horizontal: AppSpacing.s4),
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                         decoration: BoxDecoration(
                           gradient: isSelected
                               ? LinearGradient(
@@ -215,7 +215,7 @@ class _MainShellState extends State<MainShell> {
                               duration: const Duration(milliseconds: 250),
                               width: isSelected ? 4 : 0,
                               height: isSelected ? 4 : 0,
-                              margin: const EdgeInsets.only(bottom: 4),
+                              margin: const EdgeInsets.only(bottom: 3),
                               decoration: BoxDecoration(
                                 color: colors.primary,
                                 shape: BoxShape.circle,
@@ -231,26 +231,28 @@ class _MainShellState extends State<MainShell> {
                               ),
                             ),
                             AnimatedScale(
-                              scale: isSelected ? 1.08 : 1.0,
+                              scale: isSelected ? 1.05 : 1.0,
                               duration: const Duration(milliseconds: 200),
                               child: Icon(
                                 item.icon,
-                                size: 21,
+                                size: 20,
                                 color: isSelected ? colors.primary : colors.textMuted,
                               ),
                             ),
-                            AppSpacing.vGap4,
-                            Text(
-                              item.label,
-                              style: AppTextStyles.caption(
-                                color: isSelected ? colors.primary : colors.textMuted,
-                              ).copyWith(
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                fontSize: 11,
-                                height: 1.2,
+                            AppSpacing.vGap2,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                item.label,
+                                style: AppTextStyles.caption(
+                                  color: isSelected ? colors.primary : colors.textMuted,
+                                ).copyWith(
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                  fontSize: 11,
+                                  height: 1.2,
+                                ),
+                                maxLines: 1,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),

@@ -99,11 +99,17 @@ class TTSWrapper:
         clean_text = clean_tts_text(text)
         if not clean_text:
             return b""
-        communicate = edge_tts.Communicate(clean_text, self.edge_voice)
+        rate = getattr(settings, "TTS_RATE", "+15%")
+        communicate = edge_tts.Communicate(clean_text, self.edge_voice, rate=rate)
         audio_data = bytearray()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_data.extend(chunk["data"])
+
+        async def _stream_chunks():
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_data.extend(chunk["data"])
+
+        # Timeout after 4 seconds to avoid Render cloud stalls
+        await asyncio.wait_for(_stream_chunks(), timeout=4.0)
         return bytes(audio_data)
 
     def _synthesize_kokoro(self, text: str) -> bytes:

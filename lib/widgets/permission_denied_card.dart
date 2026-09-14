@@ -57,20 +57,19 @@ class PermissionDeniedCard extends StatelessWidget {
             style: AppTextStyles.bodySmall(color: colors.textSecondary),
           ),
           AppSpacing.vGap16,
-          Row(
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
             children: [
-              Expanded(
-                child: AppButton(
-                  text: 'Open App Settings',
-                  leadingIcon: LucideIcons.settings,
-                  variant: AppButtonVariant.primary,
-                  size: AppButtonSize.sm,
-                  onPressed: () async {
-                    await openAppSettings();
-                  },
-                ),
+              AppButton(
+                text: 'Open App Settings',
+                leadingIcon: LucideIcons.settings,
+                variant: AppButtonVariant.primary,
+                size: AppButtonSize.sm,
+                onPressed: () async {
+                  await openAppSettings();
+                },
               ),
-              AppSpacing.hGap8,
               AppButton(
                 text: 'Try Again',
                 leadingIcon: LucideIcons.refreshCw,

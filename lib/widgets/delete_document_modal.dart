@@ -57,10 +57,11 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
         border: Border(top: BorderSide(color: colors.borderSubtle, width: 1)),
         boxShadow: AppShadows.card(isDark),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Drag handle
           Center(
             child: Container(
@@ -181,6 +182,7 @@ class _DeleteDocumentModalState extends State<DeleteDocumentModal> {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }

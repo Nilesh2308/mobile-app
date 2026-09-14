@@ -60,7 +60,8 @@ async def voice_chat(
         
     try:
         # 2. Transcribe (STT)
-        query = await run_in_threadpool(stt_service.transcribe, audio_bytes)
+        filename = getattr(file, "filename", "audio.m4a") or "audio.m4a"
+        query = await run_in_threadpool(stt_service.transcribe, audio_bytes, filename)
         if not query or not query.strip():
             raise HTTPException(status_code=400, detail="Could not understand audio. Please speak clearly.")
             

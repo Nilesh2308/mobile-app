@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 from app.core.config import settings
 from app.core.qdrant_client import qdrant_db
 from app.core.embeddings import embedding_service
-from app.core.qwen_client import qwen_service
+from app.core.llm_service import llm_service
 from app.core.memory_store import session_memory
 from app.core.analytics import analytics_store
 from app.services.kb_service import kb_service
@@ -89,7 +89,7 @@ class RAGService:
         messages = [{"role": "system", "content": system_prompt}] + formatted_history[-2:] + [
             {"role": "user", "content": query}
         ]
-        return qwen_service.generate_text(messages=messages, model=None)
+        return llm_service.generate_text(messages=messages, is_voice=is_voice)
 
     def _is_document_overview_query(self, query: str) -> bool:
         q = query.lower().strip()
@@ -217,7 +217,7 @@ class RAGService:
             {"role": "user", "content": f"Document excerpts from Knowledge Base:\n{combined_docs_text}\n\nUser Question: {query}"}
         ]
         
-        answer = qwen_service.generate_text(messages=messages, model=None)
+        answer = llm_service.generate_text(messages=messages, is_voice=is_voice)
         source = "knowledge_base"
         
         session_memory.add_turn(session_id, query, answer)
@@ -350,7 +350,7 @@ class RAGService:
                 {"role": "user", "content": f"Context excerpts:\n{combined_context}\n\nQuestion: {query}"}
             ]
 
-            answer = qwen_service.generate_text(messages=messages, model=None)
+            answer = llm_service.generate_text(messages=messages, is_voice=is_voice)
 
             # Determine whether answer was from KB or out-of-scope refusal
             lower_ans = answer.lower()

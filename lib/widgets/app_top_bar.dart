@@ -65,7 +65,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Container(
                   height: height - 1.0,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
                   child: Row(
                     children: [
                       if (showBackButton) ...[
@@ -91,36 +91,44 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                             ),
                           ),
                         ),
-                        AppSpacing.hGap12,
+                        AppSpacing.hGap8,
                       ] else if (leading != null) ...[
                         leading!,
-                        AppSpacing.hGap12,
+                        AppSpacing.hGap8,
                       ],
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              title,
-                              style: AppTextStyles.headingSmall(color: colors.textPrimary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                title,
+                                style: AppTextStyles.headingSmall(color: colors.textPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             if (subtitle != null) ...[
                               AppSpacing.vGap2,
-                              Text(
-                                subtitle!,
-                                style: AppTextStyles.caption(color: colors.textSecondary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  subtitle!,
+                                  style: AppTextStyles.caption(color: colors.textSecondary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ],
                         ),
                       ),
                       if (actions != null) ...[
-                        AppSpacing.hGap8,
+                        AppSpacing.hGap6,
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: actions!,

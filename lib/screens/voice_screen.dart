@@ -44,11 +44,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
   bool _isAutoEnding = false;
   bool _isProcessingRecording = false;
   int _speechTickCount = 0;
-  int _secondsUntilAutoStop = 3;
 
   // Sensitive speech threshold (-48 dB catches regular & soft speaking voice)
   static const double _speechThresholdDb = -48.0;
-  static const Duration _silenceAutoStopDuration = Duration(milliseconds: 3000);
+  static const Duration _silenceAutoStopDuration = Duration(milliseconds: 1350);
   static const Duration _maxRecordingDuration = Duration(seconds: 45);
 
   // Status subtitle display text
@@ -56,17 +55,15 @@ class _VoiceScreenState extends State<VoiceScreen> {
     switch (_voiceState) {
       case VoiceRingState.listening:
         if (_isAutoEnding) {
-          return 'Pause detected. Generating answer...';
-        } else if (_hasDetectedSpeech && _secondsUntilAutoStop <= 2 && _secondsUntilAutoStop > 0) {
-          return 'Listening... (auto-sending in ${_secondsUntilAutoStop}s)';
+          return 'Processing your question...';
         } else if (_hasDetectedSpeech) {
-          return 'Listening... Speak your question';
+          return 'Listening...';
         }
         return 'Listening... Speak now';
       case VoiceRingState.transcribing:
-        return 'Transcribing your voice...';
+        return 'Transcribing voice...';
       case VoiceRingState.thinking:
-        return 'Thinking & searching documents...';
+        return 'Analyzing documents...';
       case VoiceRingState.speaking:
         return 'Speaking response...';
       case VoiceRingState.idle:
@@ -173,7 +170,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
       _silenceStartTime = null;
       _peakDb = -160.0;
       _speechTickCount = 0;
-      _secondsUntilAutoStop = 3;
       _hasDetectedSpeech = false;
       _isAutoEnding = false;
       _isProcessingRecording = false;
@@ -202,10 +198,9 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
     _peakDb = -160.0;
     _speechTickCount = 0;
-    _secondsUntilAutoStop = 3;
     _silenceStartTime = null;
 
-    _silenceCheckTimer = Timer.periodic(const Duration(milliseconds: 200), (timer) async {
+    _silenceCheckTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) async {
       if (_voiceState != VoiceRingState.listening || _isProcessingRecording) {
         return;
       }
@@ -227,9 +222,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
             _hasDetectedSpeech = true;
           }
           _silenceStartTime = null;
-          if (_secondsUntilAutoStop != 3 && mounted) {
+          if (_isAutoEnding && mounted) {
             setState(() {
-              _secondsUntilAutoStop = 3;
               _isAutoEnding = false;
             });
           }
@@ -237,17 +231,16 @@ class _VoiceScreenState extends State<VoiceScreen> {
           if (_hasDetectedSpeech) {
             _silenceStartTime ??= DateTime.now();
             final silenceElapsed = DateTime.now().difference(_silenceStartTime!);
-            final remainingSec = 3 - (silenceElapsed.inMilliseconds ~/ 1000);
 
             if (silenceElapsed >= _silenceAutoStopDuration) {
               _isAutoEnding = true;
               if (mounted) setState(() {});
               _stopAndProcessRecording();
               return;
-            } else if (remainingSec != _secondsUntilAutoStop && remainingSec >= 0) {
-              if (mounted && !_isAutoEnding) {
+            } else if (silenceElapsed.inMilliseconds >= 700 && !_isAutoEnding) {
+              if (mounted) {
                 setState(() {
-                  _secondsUntilAutoStop = remainingSec;
+                  _isAutoEnding = true;
                 });
               }
             }
@@ -518,13 +511,17 @@ class _VoiceScreenState extends State<VoiceScreen> {
     final messages = sessionProvider.voiceMessages;
     final stateColor = _getStateColor(colors);
     final orbGradient = _getOrbGradient();
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final isCompact = screenHeight < 720;
+    final orbDiameter = isCompact ? 80.0 : 92.0;
+    final orbIconSize = isCompact ? 32.0 : 36.0;
 
     return Column(
       children: [
         // Permission Denied Warning Card
         if (_isMicPermissionDenied)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s8),
             child: PermissionDeniedCard(
               onRequestPermission: _checkPermission,
             ),
@@ -532,19 +529,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
         // Focal Mic Button & Premium Animated Voice Orb
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+          padding: EdgeInsets.symmetric(vertical: isCompact ? AppSpacing.s6 : AppSpacing.s10),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               VoiceWaveformRing(
                 state: _voiceState,
-                diameter: 100,
+                diameter: orbDiameter,
                 child: GestureDetector(
                   onTap: _toggleRecording,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 280),
                     curve: Curves.easeOutCubic,
-                    width: 100,
-                    height: 100,
+                    width: orbDiameter,
+                    height: orbDiameter,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
@@ -555,7 +553,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
                       boxShadow: AppShadows.neonGlow(
                         stateColor,
                         intensity: _voiceState == VoiceRingState.idle ? 0.2 : 0.45,
-                        blur: _voiceState == VoiceRingState.idle ? 16 : 28,
+                        blur: _voiceState == VoiceRingState.idle ? 14 : 24,
                       ),
                     ),
                     child: Center(
@@ -570,7 +568,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
                                       ? LucideIcons.loader2
                                       : LucideIcons.mic)),
                           key: ValueKey(_voiceState),
-                          size: 38,
+                          size: orbIconSize,
                           color: Colors.white,
                         ),
                       ),
@@ -578,21 +576,21 @@ class _VoiceScreenState extends State<VoiceScreen> {
                   ),
                 ),
               ),
-              AppSpacing.vGap12,
+              SizedBox(height: isCompact ? 6 : 10),
 
               // Animated status text
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 child: Padding(
                   key: ValueKey(_statusLabel),
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s24),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
                   child: Text(
                     _statusLabel,
                     textAlign: TextAlign.center,
                     style: AppTextStyles.bodyMedium(
                       color: stateColor,
                       fontWeight: FontWeight.w600,
-                    ),
+                    ).copyWith(fontSize: isCompact ? 12.5 : 13.5),
                   ),
                 ),
               ),
@@ -641,40 +639,51 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   Widget _buildVoiceEmptyState(AppThemeColors colors) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s32, vertical: AppSpacing.s24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              LucideIcons.audioWaveform,
-              size: 32,
-              color: colors.primary.withValues(alpha: 0.5),
-            )
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scale(
-                  begin: const Offset(0.9, 0.9),
-                  end: const Offset(1.1, 1.1),
-                  duration: 2000.ms,
-                  curve: Curves.easeInOut,
-                )
-                .fade(begin: 0.5, end: 1.0, duration: 2000.ms),
-            AppSpacing.vGap16,
-            Text(
-              'Voice Assistant Ready',
-              style: AppTextStyles.headingMedium(color: colors.textPrimary),
-              textAlign: TextAlign.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s24, vertical: AppSpacing.s12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.audioWaveform,
+                      size: 28,
+                      color: colors.primary.withValues(alpha: 0.5),
+                    )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scale(
+                          begin: const Offset(0.9, 0.9),
+                          end: const Offset(1.1, 1.1),
+                          duration: 2000.ms,
+                          curve: Curves.easeInOut,
+                        )
+                        .fade(begin: 0.5, end: 1.0, duration: 2000.ms),
+                    AppSpacing.vGap12,
+                    Text(
+                      'Voice Assistant Ready',
+                      style: AppTextStyles.headingMedium(color: colors.textPrimary),
+                      textAlign: TextAlign.center,
+                    ),
+                    AppSpacing.vGap6,
+                    Text(
+                      'Tap the microphone above to speak your question.\nThe assistant auto-detects when you pause.',
+                      style: AppTextStyles.bodySmall(color: colors.textSecondary),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
             ),
-            AppSpacing.vGap8,
-            Text(
-              'Tap the microphone above to speak your question.\nThe assistant auto-detects when you pause.',
-              style: AppTextStyles.bodySmall(color: colors.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     )
         .animate()
         .fadeIn(duration: 400.ms)

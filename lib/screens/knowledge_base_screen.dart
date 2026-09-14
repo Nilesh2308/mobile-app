@@ -285,26 +285,35 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Text(
-                    'Indexed Documents',
-                    style: AppTextStyles.headingSmall(color: colors.textPrimary),
-                  ),
-                  AppSpacing.hGap8,
-                  AppBadge(
-                    label: '${_documents.length}',
-                    variant: AppBadgeVariant.neutral,
-                    showDot: false,
-                  ),
-                ],
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Indexed Documents',
+                        style: AppTextStyles.headingSmall(color: colors.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    AppSpacing.hGap8,
+                    AppBadge(
+                      label: '${_documents.length}',
+                      variant: AppBadgeVariant.neutral,
+                      showDot: false,
+                    ),
+                  ],
+                ),
               ),
-              if (_documents.isNotEmpty)
+              if (_documents.isNotEmpty) ...[
+                AppSpacing.hGap8,
                 AppBadge(
                   label: '${_documents.fold(0, (acc, d) => acc + d.chunkCount)} chunks',
                   variant: AppBadgeVariant.brand,
                   showDot: false,
                 ),
+              ],
             ],
           ),
           AppSpacing.vGap12,
@@ -412,6 +421,8 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
             AppSpacing.vGap16,
             Wrap(
               spacing: AppSpacing.s6,
+              runSpacing: AppSpacing.s6,
+              alignment: WrapAlignment.center,
               children: const [
                 AppBadge(label: 'PDF', variant: AppBadgeVariant.neutral, showDot: false),
                 AppBadge(label: 'DOCX', variant: AppBadgeVariant.neutral, showDot: false),
@@ -544,48 +555,53 @@ class _KnowledgeBaseScreenState extends State<KnowledgeBaseScreen> {
       borderRadius: AppRadius.borderR16,
       child: AppCard(
         useGlass: isDark,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s10),
         child: Row(
           children: [
-            _buildFileIcon(doc.filename, colors, size: 22),
-          AppSpacing.hGap12,
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  doc.filename,
-                  style: AppTextStyles.bodyMedium(
-                    color: colors.textPrimary,
-                    fontWeight: FontWeight.w600,
+            _buildFileIcon(doc.filename, colors, size: 20),
+            AppSpacing.hGap10,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    doc.filename,
+                    style: AppTextStyles.bodyMedium(
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                AppSpacing.vGap4,
-                Row(
-                  children: [
-                    Text(
-                      _formatDate(doc.uploadedAt),
-                      style: AppTextStyles.caption(color: colors.textSecondary),
-                    ),
-                    AppSpacing.hGap8,
-                    Text('•', style: AppTextStyles.caption(color: colors.textMuted)),
-                    AppSpacing.hGap8,
-                    Text(
-                      '${doc.chunkCount} chunks',
-                      style: AppTextStyles.mono(color: colors.primary),
-                    ),
-                  ],
-                ),
-              ],
+                  AppSpacing.vGap4,
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 2,
+                    children: [
+                      Text(
+                        _formatDate(doc.uploadedAt),
+                        style: AppTextStyles.caption(color: colors.textSecondary),
+                      ),
+                      Text('•', style: AppTextStyles.caption(color: colors.textMuted)),
+                      Text(
+                        '${doc.chunkCount} chunks',
+                        style: AppTextStyles.mono(color: colors.primary),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(LucideIcons.trash2, size: 16),
-            color: colors.textMuted,
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            onPressed: () => _handleDelete(doc),
+            IconButton(
+              icon: const Icon(LucideIcons.trash2, size: 16),
+              color: colors.textMuted,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              padding: const EdgeInsets.all(8),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              onPressed: () => _handleDelete(doc),
             ),
           ],
         ),
